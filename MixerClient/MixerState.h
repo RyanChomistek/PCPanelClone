@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+#include <audioclient.h>
 
 enum class EventType: int
 {
@@ -15,6 +17,12 @@ enum class Direction: int
 struct MixerState
 {
 	int m_Counter;
+	std::wstring m_processName;
+	ISimpleAudioVolume* m_pVolume;
 };
+
+void InitMixerState();
+
+void PrintVolumes();
 
 void HandleSerialInput(const char* szBuffer);

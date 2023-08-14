@@ -14,3 +14,5 @@ MixerClient/.vs/MixerClient/v17/Browse.VC.db-wal
 MixerClient/.vs/MixerClient/v17/Browse.VC.opendb
 MixerClient/MixerClient.vcxproj.user
 MixerClient/MixerClient.vcxproj.filters
+*.exe
+*.ilk

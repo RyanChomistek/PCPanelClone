@@ -127,7 +127,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Epvolump.cpp" />
     <ClCompile Include="MixerClient.cpp" />
     <ClCompile Include="MixerState.cpp" />
     <ClCompile Include="Serial.cpp" />
@@ -135,7 +134,6 @@
     <ClCompile Include="SerialWnd.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Epvolume.h" />
     <ClInclude Include="MixerState.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Serial.h" />

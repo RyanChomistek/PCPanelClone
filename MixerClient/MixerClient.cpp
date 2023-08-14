@@ -6,6 +6,8 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <mmdeviceapi.h>
+#include <audiopolicy.h>
 #include "Serial.h"
 #include "MixerState.h"
 
@@ -24,6 +26,8 @@ int ShowError(LONG lError, LPCTSTR lptszMessage)
 
 int main()
 {
+	InitMixerState();
+
 	CSerial serial;
 	LONG    lLastError = ERROR_SUCCESS;
 
