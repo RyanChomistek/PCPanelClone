@@ -1,0 +1,16 @@
+
+*.tlog
+*.pdb
+*.obj
+*.log
+*.idb
+*.ipch
+*.lock
+*.vsidx
+MixerClient/.vs/MixerClient/v17/.suo
+MixerClient/.vs/MixerClient/v17/Browse.VC.db
+MixerClient/.vs/MixerClient/v17/Browse.VC.db-shm
+MixerClient/.vs/MixerClient/v17/Browse.VC.db-wal
+MixerClient/.vs/MixerClient/v17/Browse.VC.opendb
+MixerClient/MixerClient.vcxproj.user
+MixerClient/MixerClient.vcxproj.filters

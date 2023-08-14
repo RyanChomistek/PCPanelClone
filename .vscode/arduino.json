@@ -1,0 +1,6 @@
+{
+    "sketch": "Mixer.ino",
+    "board": "arduino:avr:uno",
+    "programmer": "avrisp",
+    "port": "COM5"
+}
