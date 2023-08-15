@@ -8,6 +8,14 @@
 #include <string>
 #include <tchar.h>
 #include <windows.h>
+#include <shlobj.h>
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <endpointvolume.h>
+
+#pragma comment(lib, "shell32.lib")
+
+using namespace nlohmann::literals;
 
 void PrintVolumes()
 {
@@ -82,10 +90,85 @@ void PrintVolumes()
 constexpr int numDials = 4;
 static MixerState states[numDials];
 
+
 void InitMixerState()
 {
-	states[3].m_processName = L"firefox.exe";
+	PrintVolumes();
 
+	WCHAR my_documents[MAX_PATH];
+	HRESULT result = SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, my_documents);
+
+	nlohmann::json settings;
+	std::wstring filepath = std::wstring(my_documents) + L"\\MixerSettings.json";
+	std::fstream f(filepath);
+
+	if (!f.good())
+	{
+		// setup default state
+		settings = R"(
+			{
+				"dials":
+				[
+					{
+						"Target":3
+					},
+					{
+						"Target":1
+					},
+					{
+						"Target":0,
+						"Processes":["firefox.exe", "msedge.exe"]
+					},
+					{
+						"Target":0,
+						"Processes":["Discord.exe", "teams.exe"]
+					}
+				]
+			})"_json;
+
+		f.close();
+		f.open(filepath, std::ios::out);
+		f << settings.dump();
+	}
+	else
+	{
+		settings = nlohmann::json::parse(f);
+	}
+
+	f.close();
+	
+	int iDial = 0;
+	// get the settings out
+	for (auto& dialSetting : settings["dials"])
+	{
+		MixerState& state = states[iDial];
+		state.m_targetType = dialSetting["Target"].get<TargetType>();
+
+		switch (state.m_targetType)
+		{
+			case TargetType::Process:
+			{
+				std::vector<std::wstring> processNames;
+				for (auto& processSetting : dialSetting["Processes"])
+				{
+					std::cout << processSetting.get<std::string>() << "\n";
+					std::string processName = processSetting.get<std::string>();
+					processNames.push_back(std::wstring(processName.begin(), processName.end()));
+				}
+
+				state.m_vecProcessNames = std::move(processNames);
+				break;
+			}
+			case TargetType::All:
+				break;
+			case TargetType::Device:
+				break;
+			case TargetType::Focus:
+				break;
+		}
+
+		iDial++;
+	}
 
 }
 
@@ -163,6 +246,32 @@ void SetVolume(const std::wstring& processName, float volumeDelta)
 	}
 }
 
+void SetMasterVolume(float volumeDelta)
+{
+	HRESULT hr;
+	CoInitialize(NULL);
+	IMMDeviceEnumerator* deviceEnumerator = NULL;
+	hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator);
+	IMMDevice* defaultDevice = NULL;
+
+	hr = deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice);
+	deviceEnumerator->Release();
+	deviceEnumerator = NULL;
+
+	IAudioEndpointVolume* endpointVolume = NULL;
+	hr = defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID*)&endpointVolume);
+	defaultDevice->Release();
+	defaultDevice = NULL;
+
+	float volume = 0;
+	endpointVolume->GetMasterVolumeLevelScalar(&volume);
+	std::cout << volume << " " << volumeDelta << std::endl;
+	volume += volumeDelta;
+
+	float newVolume = max(min(volume, 1), 0);
+	endpointVolume->SetMasterVolumeLevelScalar(newVolume, NULL);
+}
+
 void HandleSerialInput(const char* szBuffer)
 {
 	static std::string str;
@@ -189,7 +298,16 @@ void HandleSerialInput(const char* szBuffer)
 
 				int deltaCnt = states[dialId].m_Counter - cnt;
 
-				SetVolume(states[dialId].m_processName, deltaCnt*.05f);
+				if (states[dialId].m_targetType == TargetType::Process)
+				{
+					for (std::wstring processName : states[dialId].m_vecProcessNames)
+						SetVolume(processName, deltaCnt * .05f);
+				}
+				else if (states[dialId].m_targetType == TargetType::All)
+				{
+					SetMasterVolume(deltaCnt * .05f);
+				}
+				TODO handle setting the focused process volume (proably get the focused process id and do the same thing as the process name)
 
 				states[dialId].m_Counter = cnt;
 				break;

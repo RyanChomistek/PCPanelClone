@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <audioclient.h>
 
 enum class EventType: int
@@ -14,11 +15,19 @@ enum class Direction: int
 	CW = 1
 };
 
+enum class TargetType : int 
+{
+	Process = 0,
+	All = 1,
+	Device = 2,
+	Focus = 3
+};
+
 struct MixerState
 {
 	int m_Counter;
-	std::wstring m_processName;
-	ISimpleAudioVolume* m_pVolume;
+	std::vector<std::wstring> m_vecProcessNames;
+	TargetType m_targetType;
 };
 
 void InitMixerState();

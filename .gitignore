@@ -16,3 +16,5 @@ MixerClient/MixerClient.vcxproj.user
 MixerClient/MixerClient.vcxproj.filters
 *.exe
 *.ilk
+*.p7s
+MixerClient/packages/nlohmann.json.3.11.2/nlohmann.json.3.11.2.nupkg
