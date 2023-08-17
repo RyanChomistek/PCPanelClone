@@ -3,10 +3,18 @@
 #include <vector>
 #include <audioclient.h>
 
-enum class EventType: int
+class CSerial;
+
+enum class DeviceToClientEventType : int
 {
 	Button = 0,
-	Dial = 1
+	Dial = 1,
+	StartUp = 2
+};
+
+enum class ClientToDeviceEventType : int
+{
+	Color = 0,
 };
 
 enum class Direction: int
@@ -28,10 +36,15 @@ struct MixerState
 	int m_Counter;
 	std::vector<std::wstring> m_vecProcessNames;
 	TargetType m_targetType;
+	int r, g, b;
 };
+
+void WriteColorData(CSerial& serial);
+
+const MixerState* RgMixerState(_Out_ int& cStates);
 
 void InitMixerState();
 
 void PrintVolumes();
 
-void HandleSerialInput(const char* szBuffer);
+void HandleSerialInput(const char* szBuffer, CSerial& serial);

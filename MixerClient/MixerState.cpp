@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <endpointvolume.h>
+#include "Serial.h"
 
 #pragma comment(lib, "shell32.lib")
 
@@ -90,10 +91,29 @@ void PrintVolumes()
 constexpr int numDials = 4;
 static MixerState states[numDials];
 
+const MixerState* RgMixerState(_Out_ int& cStates)
+{
+	cStates = numDials;
+	return states;
+}
+
+void WriteColorData(CSerial& serial)
+{
+	std::stringstream ss;
+
+	for (int iState = 0; iState < numDials; iState++)
+	{
+		const MixerState& state = states[iState];
+		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << ";";
+	}
+
+	std::cout << ss.str() << "\n";
+	serial.Write(ss.str().c_str(), ss.str().size());
+}
 
 void InitMixerState()
 {
-	PrintVolumes();
+	//PrintVolumes();
 
 	WCHAR my_documents[MAX_PATH];
 	HRESULT result = SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, my_documents);
@@ -110,18 +130,22 @@ void InitMixerState()
 				"dials":
 				[
 					{
-						"Target":3
+						"Target":3,
+						"Color": [2,0,0]
 					},
 					{
-						"Target":1
+						"Target":1,
+						"Color": [0,2,0]
 					},
 					{
 						"Target":0,
-						"Processes":["firefox.exe", "msedge.exe"]
+						"Processes":["firefox.exe", "msedge.exe"],
+						"Color": [0,0,2]
 					},
 					{
 						"Target":0,
-						"Processes":["Discord.exe", "teams.exe"]
+						"Processes":["Discord.exe", "teams.exe"],
+						"Color": [2,0,1]
 					}
 				]
 			})"_json;
@@ -167,9 +191,12 @@ void InitMixerState()
 				break;
 		}
 
+		state.r = dialSetting["Color"][0].get<int>();
+		state.g = dialSetting["Color"][1].get<int>();
+		state.b = dialSetting["Color"][2].get<int>();
+
 		iDial++;
 	}
-
 }
 
 void SetVolume(const std::wstring& processName, float volumeDelta)
@@ -272,12 +299,45 @@ void SetMasterVolume(float volumeDelta)
 	endpointVolume->SetMasterVolumeLevelScalar(newVolume, NULL);
 }
 
-void HandleSerialInput(const char* szBuffer)
+void SetFocusedVolume(float volumeDelta)
+{
+	HWND wndFocused = GetForegroundWindow();
+
+	DWORD pid = NULL;
+	DWORD tid = GetWindowThreadProcessId(wndFocused, &pid);
+
+	if (tid == 0)
+	{
+		return;
+	}
+
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (hProcess != NULL)
+	{
+		WCHAR wsImageName[MAX_PATH + 1];
+		DWORD nSize = MAX_PATH;
+		if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
+		{
+			std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\") + 1);
+			SetVolume(executableName, volumeDelta);
+		}
+		CloseHandle(hProcess);
+	}
+}
+
+void HandleSerialInput(const char* szBuffer, CSerial& serial)
 {
 	static std::string str;
 	
 	str += szBuffer;
 	
+	while (str.find('|') != std::string::npos)
+	{
+		std::string comment = str.substr(0, str.find('|'));
+		std::cout << "<" << comment << ">" << '\n';
+		str = str.substr(str.find('|') + 1, str.length());
+	}
+
 	while (str.find(';') != std::string::npos)
 	{
 		std::string token = str.substr(0, str.find(';'));
@@ -286,30 +346,37 @@ void HandleSerialInput(const char* szBuffer)
 		int dialId, type;
 		ss >> dialId >> type;
 
-		switch (static_cast<EventType>(type))
+		switch (static_cast<DeviceToClientEventType>(type))
 		{
-			case EventType::Button:
+			case DeviceToClientEventType::Button:
 				std::cout << "btn id:" << dialId << '\n';
 				break;
-			case EventType::Dial:
+			case DeviceToClientEventType::Dial:
+			{
 				int dir, cnt;
 				ss >> dir >> cnt;
 				std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
 
 				int deltaCnt = states[dialId].m_Counter - cnt;
 
-				if (states[dialId].m_targetType == TargetType::Process)
+				switch (states[dialId].m_targetType)
 				{
+				case TargetType::Process:
 					for (std::wstring processName : states[dialId].m_vecProcessNames)
 						SetVolume(processName, deltaCnt * .05f);
-				}
-				else if (states[dialId].m_targetType == TargetType::All)
-				{
+					break;
+				case TargetType::All:
 					SetMasterVolume(deltaCnt * .05f);
+					break;
+				case TargetType::Focus:
+					SetFocusedVolume(deltaCnt * .05f);
 				}
-				TODO handle setting the focused process volume (proably get the focused process id and do the same thing as the process name)
 
 				states[dialId].m_Counter = cnt;
+				break;
+			}
+			case DeviceToClientEventType::StartUp:
+				WriteColorData(serial);
 				break;
 		}
 

@@ -5,9 +5,11 @@
 #include <tchar.h>
 #include <windows.h>
 #include <stdio.h>
+#include <sstream>
 #include <string.h>
 #include <mmdeviceapi.h>
 #include <audiopolicy.h>
+#include <mutex>
 #include "Serial.h"
 #include "MixerState.h"
 
@@ -26,18 +28,17 @@ int ShowError(LONG lError, LPCTSTR lptszMessage)
 
 int main()
 {
-	InitMixerState();
-
 	CSerial serial;
 	LONG    lLastError = ERROR_SUCCESS;
 
 	// Attempt to open the serial port (COM1)
-	lLastError = serial.Open(_T("COM5"), 0, 0, false);
+	lLastError = serial.Open(_T("COM6"), 0, 0, false);
 	if (lLastError != ERROR_SUCCESS)
 		return ::ShowError(serial.GetLastError(), _T("Unable to open COM-port"));
 
 	// Setup the serial port (9600,8N1, which is the default setting)
 	lLastError = serial.Setup(CSerial::EBaud9600, CSerial::EData8, CSerial::EParNone, CSerial::EStop1);
+
 	if (lLastError != ERROR_SUCCESS)
 		return ::ShowError(serial.GetLastError(), _T("Unable to set COM-port setting"));
 
@@ -59,6 +60,10 @@ int main()
 	if (lLastError != ERROR_SUCCESS)
 		return ::ShowError(serial.GetLastError(), _T("Unable to set COM-port read timeout."));
 
+	InitMixerState();
+
+	std::once_flag fSendColorInfo;
+
 	// Keep reading data, until an EOF (CTRL-Z) has been received
 	bool fContinue = true;
 	do
@@ -67,6 +72,10 @@ int main()
 		lLastError = serial.WaitEvent();
 		if (lLastError != ERROR_SUCCESS)
 			return ::ShowError(serial.GetLastError(), _T("Unable to wait for a COM-port event."));
+
+		std::call_once(fSendColorInfo, [&serial]() {
+			WriteColorData(serial);
+			});
 
 		// Save event
 		const CSerial::EEvent eEvent = serial.GetEventType();
@@ -139,7 +148,7 @@ int main()
 					szBuffer[dwBytesRead] = '\0';
 
 					// Display the data
-					HandleSerialInput(szBuffer);
+					HandleSerialInput(szBuffer, serial);
 
 					// Check if EOF (CTRL+'[') has been specified
 					if (strchr(szBuffer, EOF_Char))

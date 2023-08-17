@@ -1,11 +1,3 @@
-// Rotary Encoder Inputs
-#define CLK 2
-#define DT 3
-#define SW 4
-
-#define NumKnobs 4
-#define NumPinsPerKnob 3
-
 enum Direction
 {
   CCW = 0,
@@ -21,42 +13,161 @@ struct EncoderState
   unsigned long lastButtonPress = 0;
 };
 
-enum EventType
+const int encodersStartPin = 22;
+const int CLK = 0;
+const int DT = 1;
+const int SW = 2;
+const int NumDials = 4;
+const int NumPinsPerDial = 3;
+EncoderState ecoders[NumDials];
+
+enum OutputEventType
 {
   Button = 0,
-  Dial = 1
+  Dial = 1,
+  StartUp = 2
 };
 
-EncoderState ecoders[4];
+const int lightStartPin = 2;
+
+const int pinsPerLight = 3;
+
+struct Light
+{
+  int r, g, b;
+};
+
+const int numLights = 4;
+Light lights[numLights];
+
+int RedPin(int iLight)
+{
+  return iLight * pinsPerLight + lightStartPin;
+}
+
+int GreenPin(int iLight)
+{
+  return iLight * pinsPerLight + 1 + lightStartPin;
+}
+
+int BluePin(int iLight)
+{
+  return iLight * pinsPerLight + 2 + lightStartPin;
+}
+
+enum InputEventType
+{
+  color = 0
+};
+
+int CLKPin(int iDial)
+{
+  return CLK + NumPinsPerDial*iDial + encodersStartPin;
+}
+
+int DTPin(int iDial)
+{
+  return DT + NumPinsPerDial*iDial + encodersStartPin;
+}
+
+int SWPin(int iDial)
+{
+  return SW + NumPinsPerDial*iDial + encodersStartPin;
+}
 
 void setup() {
         
-  for(int iKnob = 0; iKnob < NumKnobs; iKnob++)
+  for(int iDial = 0; iDial < NumDials; iDial++)
   {
-    // Set encoder pins as inputs
-    pinMode(CLK + NumPinsPerKnob*iKnob,INPUT);
-    pinMode(DT + NumPinsPerKnob*iKnob,INPUT);
-    pinMode(SW + NumPinsPerKnob*iKnob, INPUT_PULLUP);
+    pinMode(CLKPin(iDial), INPUT);
+    pinMode(DTPin(iDial), INPUT);
+    pinMode(SWPin(iDial), INPUT_PULLUP);
+  }
+
+  for(int iLight = 0; iLight < numLights; iLight++)
+  {
+    pinMode(RedPin(iLight), OUTPUT);
+    pinMode(GreenPin(iLight), OUTPUT);
+    pinMode(BluePin(iLight), OUTPUT);
   }
 
 	// Setup Serial Monitor
 	Serial.begin(9600);
 
-  for(int iKnob = 0; iKnob < NumKnobs; iKnob++)
+  for(int iDial = 0; iDial < NumDials; iDial++)
   {
-    ecoders[iKnob].lastStateCLK = digitalRead(CLK);
+    ecoders[iDial].lastStateCLK = digitalRead(CLK);
   }
+
+  for(int iLight = 0; iLight < numLights; iLight++)
+  {
+    pinMode(RedPin(iLight), OUTPUT);
+    pinMode(GreenPin(iLight), OUTPUT);
+    pinMode(BluePin(iLight), OUTPUT);
+  }
+
+  Serial.print(OutputEventType::StartUp);
+  Serial.print(";");
+  Serial.flush();
 }
 
 void loop() {
+  ReadSerial();
+  OutputLEDs();
+  OutputEncoderData();
+}
+
+void ReadSerial()
+{
+  char outputBuffer[255];
+
+  if (Serial.available() > 0) {
+    InputEventType inputEvent = (InputEventType) Serial.parseInt();
+
+    switch(inputEvent)
+    {
+      case InputEventType::color:
+      {
+        int iLight = Serial.parseInt();
+        Light& light =  lights[iLight];
+        light.r = Serial.parseInt();
+        light.g = Serial.parseInt();
+        light.b = Serial.parseInt();
+
+        // the input will have a trailing ";" that we can just drop
+        Serial.read();
+        break;
+      }
+    }
+  }
+}
+
+void OutputLEDs()
+{
+  for(int iLight = 0; iLight < numLights; iLight++)
+  {
+    showRGB(iLight);
+  }
+}
+
+void showRGB(int iLight)
+{
+  Light& light = lights[iLight];
+  analogWrite(RedPin(iLight), light.r);
+  analogWrite(GreenPin(iLight), light.g);
+  analogWrite(BluePin(iLight), light.b);  
+}
+
+void OutputEncoderData()
+{
   char serialBuffer[255];
 
-  for(int iKnob = 0; iKnob < NumKnobs; iKnob++)
+  for(int iDial = 0; iDial < NumDials; iDial++)
   {
-    EncoderState& currentState = ecoders[iKnob];
+    EncoderState& currentState = ecoders[iDial];
 
     // Read the current state of CLK
-    currentState.currentStateCLK = digitalRead(CLK + NumPinsPerKnob*iKnob);
+    currentState.currentStateCLK = digitalRead(CLKPin(iDial));
 
     // If last and current state of CLK are different, then pulse occurred
     // React to only 1 state change to avoid double count
@@ -64,7 +175,7 @@ void loop() {
 
       // If the DT state is different than the CLK state then
       // the encoder is rotating CCW so decrement
-      if (digitalRead(DT + NumPinsPerKnob*iKnob) != currentState.currentStateCLK) {
+      if (digitalRead(DTPin(iDial)) != currentState.currentStateCLK) {
         currentState.counter--;
         currentState.currentDir = Direction::CCW;
       } else {
@@ -73,7 +184,7 @@ void loop() {
         currentState.currentDir = Direction::CW;
       }
       
-      sprintf(serialBuffer, "%d %d %d %d;", iKnob, EventType::Dial, currentState.currentDir, currentState.counter);
+      sprintf(serialBuffer, "%d %d %d %d;", iDial, OutputEventType::Dial, currentState.currentDir, currentState.counter);
       Serial.write(serialBuffer);
     }
 
@@ -81,14 +192,14 @@ void loop() {
     currentState.lastStateCLK = currentState.currentStateCLK;
 
     // Read the button state
-    int btnState = digitalRead(SW + NumPinsPerKnob*iKnob);
+    int btnState = digitalRead(SWPin(iDial));
 
     //If we detect LOW signal, button is pressed
     if (btnState == LOW) {
       //if 50ms have passed since last LOW pulse, it means that the
       //button has been pressed, released and pressed again
       if (millis() - currentState.lastButtonPress > 50) {
-        sprintf(serialBuffer, "%d %d;", iKnob, EventType::Button);
+        sprintf(serialBuffer, "%d %d;", iDial, OutputEventType::Button);
         Serial.write(serialBuffer);
       }
 
@@ -99,5 +210,4 @@ void loop() {
     // Put in a slight delay to help debounce the reading
     delay(1);
   }
-
 }
