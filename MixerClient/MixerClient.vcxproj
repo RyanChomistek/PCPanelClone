@@ -128,18 +128,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="MixerClient.cpp" />
-    <ClCompile Include="MixerState.cpp" />
+    <ClCompile Include="VolumeMixerController.cpp" />
     <ClCompile Include="Serial.cpp" />
     <ClCompile Include="SerialEx.cpp" />
     <ClCompile Include="SerialWnd.cpp" />
+    <ClCompile Include="StandardSerialReader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MixerState.h" />
+    <ClInclude Include="VolumeMixerController.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Serial.h" />
     <ClInclude Include="SerialEx.h" />
     <ClInclude Include="SerialMFC.h" />
     <ClInclude Include="SerialWnd.h" />
+    <ClInclude Include="StandardSerialReader.h" />
+    <ClInclude Include="Util.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
