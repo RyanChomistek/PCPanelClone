@@ -110,6 +110,12 @@ void SetVolume(const std::wstring& processName, float volumeDelta)
 		__uuidof(IMMDeviceEnumerator),
 		(void**)&pEnumerator));
 
+	// Get the default audio device.
+	IfFailThrow(pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice));
+	IfFailThrow(pDevice->Activate(__uuidof(IAudioSessionManager2),
+		CLSCTX_ALL,
+		NULL, (void**)&pSessionManager));
+
 	// get the list of audio sessions (all the processes that are outputing audio)
 	IAudioSessionEnumerator* pSessionList = NULL;
 	IfFailThrow(pSessionManager->GetSessionEnumerator(&pSessionList));
