@@ -332,9 +332,9 @@ void VolumeMixerController::ReadInput()
 	}
 
 	// check for a command (delineated by ";")
-	while (m_currentReadBuffer.find(';') != std::string::npos)
+	while (m_currentReadBuffer.find('\n') != std::string::npos)
 	{
-		std::string token = m_currentReadBuffer.substr(0, m_currentReadBuffer.find(';'));
+		std::string token = m_currentReadBuffer.substr(0, m_currentReadBuffer.find('\n'));
 		std::stringstream ss(token);
 
 		int dialId, type;
@@ -354,7 +354,7 @@ void VolumeMixerController::ReadInput()
 				ss >> dir >> cnt;
 				std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
 
-				int deltaCnt = states[dialId].m_Counter - cnt;
+				int deltaCnt = cnt - states[dialId].m_Counter;
 
 				switch (states[dialId].m_targetType)
 				{
@@ -375,7 +375,7 @@ void VolumeMixerController::ReadInput()
 		}
 
 		std::cout << token << '\n';
-		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find(';') + 1, m_currentReadBuffer.length());
+		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('\n') + 1, m_currentReadBuffer.length());
 	}
 }
 

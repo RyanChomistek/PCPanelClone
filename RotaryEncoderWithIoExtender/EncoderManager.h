@@ -4,6 +4,7 @@
 #include "Adafruit_MCP23017.h"
 #include "Rotary.h"
 #include "RotaryEncOverMCP.h"
+#include "Serialization.h"
 
 #if defined(ESP32) || defined(ESP8266)
 #define INTERRUPT_FUNC_ATTRIB IRAM_ATTR
@@ -17,14 +18,20 @@ volatile boolean awakenByInterrupt = false;
 class EncoderManager
 {
 public:
-static void RotaryEncoderChanged(bool clockwise, int id) {
-    Serial.println("Encoder " + String(id) + ": "
-            + (clockwise ? String("clockwise") : String("counter-clock-wise")));
+static void RotaryEncoderChanged(Direction direction, int id, int count) {
+    // Serial.println("Encoder " + String(id) + ": "
+    //         + (clockwise ? String("clockwise") : String("counter-clock-wise")));
+    char serialBuffer[255];
+    sprintf(serialBuffer, "%d %d %d %d\n", id, OutputEventType::Dial, direction, count);
+    Serial.write(serialBuffer);
 }
 
 static void RotaryEncoderSwitchPressed(int id)
 {
-  Serial.println("pressed " + String(id));
+  //Serial.println("pressed " + String(id));
+  char serialBuffer[255];
+  sprintf(serialBuffer, "%d %d\n", id, OutputEventType::Button);
+  Serial.write(serialBuffer);
 }
 
 void setup()
@@ -34,7 +41,7 @@ void setup()
   mcp.begin();      // use default address 0
   mcp.readINTCAPAB(); //read this so that the interrupt is cleared
 
-  Serial.println("MCP23007 Interrupt Cleared");
+  // Serial.println("MCP23007 Interrupt Cleared");
 
   //initialize all rotary encoders
 
@@ -50,7 +57,7 @@ void setup()
 
   attachInterrupt(digitalPinToInterrupt(arduinoIntPin), intCallBack, FALLING);
 
-  Serial.println("MCP23007 done setup");
+  // Serial.println("MCP23007 done setup");
 }
 
 // The int handler will just signal that the int has happened
@@ -69,9 +76,6 @@ void checkInterrupt() {
 }
 
 void handleInterrupt(){
-    //Read the entire state when the interrupt occurred
-    Serial.println("interrupt");
-
     //An interrupt occurred on some MCP object.
     //since all of them are ORed together, we don't
     //know exactly which one has fired.

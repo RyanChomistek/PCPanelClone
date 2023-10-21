@@ -11,9 +11,10 @@
 /* Describes new objects based on the Rotary and Adafruit MCP23017 library */
 #include "Adafruit_MCP23017.h"
 #include "Rotary.h"
+#include "Serialization.h"
 
 /* function pointer definition */
-typedef void (*RotaryTurnFunc)(bool clockwise, int id);
+typedef void (*RotaryTurnFunc)(Direction direction, int id, int count);
 typedef void (*SwitchPressedFunc)(int id);
 
 /* We describe an object in which we instantiate a rotary encoder
@@ -57,9 +58,13 @@ public:
         if(event == DIR_CW || event == DIR_CCW) {
             //clock wise or counter-clock wise
             bool clockwise = event == DIR_CW;
+            Direction direction = clockwise ? Direction::CW : Direction::CCW;
+
+            m_cnt += clockwise ? 1 : -1;
+
             //Call into action function if registered
             if(turnFunc) {
-                turnFunc(clockwise, id);
+                turnFunc(direction, id, m_cnt);
                 return;
             }
         }
@@ -95,6 +100,7 @@ private:
     RotaryTurnFunc turnFunc = nullptr;  /* function pointer, will be called when there is an action happening */
     SwitchPressedFunc m_switchPressedFunc = nullptr;  
     int id = 0;                             /* optional ID for identification */
+    int m_cnt = 0;
 
     bool m_fSwitchState = false;
 };
