@@ -331,7 +331,7 @@ void VolumeMixerController::ReadInput()
 		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('|') + 1, m_currentReadBuffer.length());
 	}
 
-	// check for a command (delineated by ";")
+	// check for a command (delineated by "\n")
 	while (m_currentReadBuffer.find('\n') != std::string::npos)
 	{
 		std::string token = m_currentReadBuffer.substr(0, m_currentReadBuffer.find('\n'));
@@ -386,7 +386,7 @@ void VolumeMixerController::WriteColorData()
 	for (int iState = 0; iState < numDials; iState++)
 	{
 		const DialState& state = states[iState];
-		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << ";";
+		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << "\n";
 	}
 
 	std::cout << ss.str() << "\n";

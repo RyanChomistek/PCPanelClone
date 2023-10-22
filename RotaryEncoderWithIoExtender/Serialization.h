@@ -15,5 +15,6 @@ enum OutputEventType
 
 enum InputEventType
 {
-  color = 0
+  color = 0,
+  brightness = 1
 };

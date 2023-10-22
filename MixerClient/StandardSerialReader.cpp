@@ -19,8 +19,17 @@ int ShowError(LONG lError, LPCTSTR lptszMessage)
 
 HRESULT StandardSerialReader::HrConfigure(LPCTSTR lpszDevice)
 {
-	// Attempt to open the serial port (COM1)
-	lLastError = m_serial.Open(lpszDevice, 0, 0, false);
+	int cMaxConnectionAttempts = 20;
+	for (int iConnectionAttempt = 0; iConnectionAttempt < cMaxConnectionAttempts; ++iConnectionAttempt)
+	{
+		// Attempt to open the serial port (COM1)
+		lLastError = m_serial.Open(lpszDevice, 0, 0, false);
+		if (lLastError == ERROR_SUCCESS)
+			break;
+
+		Sleep(100);
+	}
+
 	if (lLastError != ERROR_SUCCESS)
 		return ::ShowError(m_serial.GetLastError(), _T("Unable to open COM-port"));
 

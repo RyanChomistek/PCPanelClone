@@ -5,7 +5,7 @@
 int main()
 {
 	VolumeMixerController reader;
-	IfFailRet(reader.HrConfigure(_T("COM4")));
+	IfFailRet(reader.HrConfigure(_T("COM5")));
 	IfFailRet(reader.HrReadLoop());
 	return NOERROR;
 }
