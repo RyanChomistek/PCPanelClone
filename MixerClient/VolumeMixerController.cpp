@@ -13,6 +13,7 @@
 #include <string>
 #include <tchar.h>
 #include <windows.h>
+#include <mutex>
 
 #include "VolumeMixerController.h"
 
@@ -337,21 +338,35 @@ void VolumeMixerController::ReadInput()
 		std::string token = m_currentReadBuffer.substr(0, m_currentReadBuffer.find('\n'));
 		std::stringstream ss(token);
 
-		int dialId, type;
-		ss >> dialId >> type;
+		int iType;
+		ss >> iType;
 
-		switch (static_cast<DeviceToClientEventType>(type))
+		DeviceToClientEventType type = static_cast<DeviceToClientEventType>(iType);
+
+		std::call_once(fFirstMessage, [this, &type]() {
+				if (type != DeviceToClientEventType::StartUp)
+				{
+					fDisconnect = true;
+				}
+			});
+
+		switch (type)
 		{
 			case DeviceToClientEventType::StartUp:
+				std::cout << "Start up" << '\n';
 				WriteColorData();
 				break;
 			case DeviceToClientEventType::Button:
+			{
+				int dialId;
+				ss >> dialId;
 				std::cout << "btn id:" << dialId << '\n';
 				break;
+			}
 			case DeviceToClientEventType::Dial:
 			{
-				int dir, cnt;
-				ss >> dir >> cnt;
+				int dialId, dir, cnt;
+				ss >> dialId >> dir >> cnt;
 				std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
 
 				int deltaCnt = cnt - states[dialId].m_Counter;

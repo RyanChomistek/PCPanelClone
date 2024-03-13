@@ -35,4 +35,5 @@ protected:
 	std::string m_currentReadBuffer;
 	static constexpr int c_serialReadBufferSize = 101;
 	LONG    lLastError = ERROR_SUCCESS;
+	bool fDisconnect = false; // set to true to tell the connection to disconnect at the next opportunity
 };

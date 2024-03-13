@@ -11,7 +11,7 @@ void setup(){
   s_ledManager.Setup(9);
 
   Serial.print(OutputEventType::StartUp);
-  Serial.print(";");
+  Serial.print("\n");
   Serial.flush();
 }
 

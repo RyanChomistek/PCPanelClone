@@ -22,7 +22,7 @@ static void RotaryEncoderChanged(Direction direction, int id, int count) {
     // Serial.println("Encoder " + String(id) + ": "
     //         + (clockwise ? String("clockwise") : String("counter-clock-wise")));
     char serialBuffer[255];
-    sprintf(serialBuffer, "%d %d %d %d\n", id, OutputEventType::Dial, direction, count);
+    sprintf(serialBuffer, "%d %d %d %d\n", OutputEventType::Dial, id, direction, count);
     Serial.write(serialBuffer);
 }
 
@@ -30,7 +30,7 @@ static void RotaryEncoderSwitchPressed(int id)
 {
   //Serial.println("pressed " + String(id));
   char serialBuffer[255];
-  sprintf(serialBuffer, "%d %d\n", id, OutputEventType::Button);
+  sprintf(serialBuffer, "%d %d\n", OutputEventType::Button, id);
   Serial.write(serialBuffer);
 }
 

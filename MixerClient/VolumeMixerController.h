@@ -3,6 +3,7 @@
 #include <vector>
 #include <audioclient.h>
 #include "StandardSerialReader.h"
+#include <mutex>
 
 /// <summary>
 /// specifies what event is being sent from device to client
@@ -69,4 +70,5 @@ private:
 	static constexpr int numDials = 4;
 	static constexpr float singleTickRotationAmount = .05f;
 	DialState states[numDials];
+	std::once_flag fFirstMessage;
 };

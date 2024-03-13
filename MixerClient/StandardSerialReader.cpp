@@ -156,7 +156,7 @@ HRESULT StandardSerialReader::HrReadLoop()
 				}
 			} while (dwBytesRead == sizeof(szBuffer) - 1);
 		}
-	} while (fContinue);
+	} while (fContinue && !fDisconnect);
 
 	// Close the port again
 	m_serial.Close();
