@@ -4,6 +4,8 @@
 #include <vector>
 #include <iostream>
 
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+
 int main()
 {
 	// try to find the right serial port that has the mixer
