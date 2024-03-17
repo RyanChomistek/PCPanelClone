@@ -98,9 +98,11 @@ HRESULT StandardSerialReader::HrReadLoop()
 	do
 	{
 		// Wait for an event
-		lLastError = m_serial.WaitEvent(0, 5000);
+		lLastError = m_serial.WaitEvent(0, 2000);
 		if (lLastError != ERROR_SUCCESS)
-			return ::ShowError(m_serial.GetLastError(), _T("Unable to wait for a COM-port event."));
+		{
+			return lLastError;
+		}
 
 		std::call_once(fOnConnected, [this]() {
 				OnConnected();
