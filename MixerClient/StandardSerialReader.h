@@ -7,6 +7,7 @@
 class StandardSerialReader
 {
 public:
+	static std::vector<std::wstring> ScanForAvailablePorts();
 
 	/// <summary>
 	/// configures the serial connection

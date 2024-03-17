@@ -387,6 +387,10 @@ void VolumeMixerController::ReadInput()
 				states[dialId].m_Counter = cnt;
 				break;
 			}
+			case DeviceToClientEventType::HeatBeat:
+			{
+				// NOP
+			}
 		}
 
 		std::cout << token << '\n';

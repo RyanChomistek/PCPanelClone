@@ -1,8 +1,12 @@
 #include <windows.h>
 #include <tchar.h>
 #include <mutex>
+#include <string>
+#include <vector>
+#include <iostream>
 
 #include "StandardSerialReader.h"
+#include "util.h"
 
 enum { EOF_Char = 27 };
 
@@ -17,13 +21,38 @@ int ShowError(LONG lError, LPCTSTR lptszMessage)
 	return 1;
 }
 
+std::vector<std::wstring> StandardSerialReader::ScanForAvailablePorts()
+{
+	wchar_t lpTargetPath[5000]; // buffer to store the path of the COM PORTS
+	std::vector<std::wstring> portList;
+
+	for (int i = 0; i < 255; i++) // checking ports from COM0 to COM255
+	{
+		std::wstring str = L"COM" + std::to_wstring(i); // converting to COM0, COM1, COM2
+		DWORD res = QueryDosDevice(str.c_str(), lpTargetPath, 5000);
+
+		// Test the return value and error if any
+		if (res != 0) //QueryDosDevice returns zero if it didn't find an object
+		{
+			portList.push_back(str);
+			std::wcout << str << ": " << lpTargetPath << std::endl;
+		}
+
+		if (::GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+		{
+		}
+	}
+
+	return portList;
+}
+
 HRESULT StandardSerialReader::HrConfigure(LPCTSTR lpszDevice)
 {
 	int cMaxConnectionAttempts = 20;
 	for (int iConnectionAttempt = 0; iConnectionAttempt < cMaxConnectionAttempts; ++iConnectionAttempt)
 	{
 		// Attempt to open the serial port (COM1)
-		lLastError = m_serial.Open(lpszDevice, 0, 0, false);
+		lLastError = m_serial.Open(lpszDevice, 0, 0, true);
 		if (lLastError == ERROR_SUCCESS)
 			break;
 
@@ -56,6 +85,8 @@ HRESULT StandardSerialReader::HrConfigure(LPCTSTR lpszDevice)
 	lLastError = m_serial.SetupReadTimeouts(CSerial::EReadTimeoutNonblocking);
 	if (lLastError != ERROR_SUCCESS)
 		return ::ShowError(m_serial.GetLastError(), _T("Unable to set COM-port read timeout."));
+
+	return ERROR_SUCCESS;
 }
 
 HRESULT StandardSerialReader::HrReadLoop()
@@ -67,7 +98,7 @@ HRESULT StandardSerialReader::HrReadLoop()
 	do
 	{
 		// Wait for an event
-		lLastError = m_serial.WaitEvent();
+		lLastError = m_serial.WaitEvent(0, 5000);
 		if (lLastError != ERROR_SUCCESS)
 			return ::ShowError(m_serial.GetLastError(), _T("Unable to wait for a COM-port event."));
 

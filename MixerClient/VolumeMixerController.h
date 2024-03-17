@@ -12,7 +12,8 @@ enum class DeviceToClientEventType : int
 {
 	Button = 0, // a button is pressed
 	Dial = 1, // a dial is turned
-	StartUp = 2 // the device restarted
+	HeatBeat = 2,
+	StartUp = 0xEE5F69, // the device restarted
 };
 
 /// <summary>
@@ -21,7 +22,7 @@ enum class DeviceToClientEventType : int
 enum class ClientToDeviceEventType : int
 {
 	Color = 0, // color event, the client is sending what colors the device should show on its LEDs
-	Brightness = 1
+	Brightness = 1,
 };
 
 enum class Direction: int
