@@ -16,6 +16,9 @@ struct Color
   }
 };
 
+// I done messed up on the PCB and flipped led's 1 and 2
+int softwareIdToPhysicalIdMap[4] = {0, 2, 1, 3};
+
 class LedManager
 {
 public:
@@ -35,7 +38,7 @@ public:
       return;
     }
 
-    int iLed = Serial.parseInt();
+    int iLed = softwareIdToPhysicalIdMap[Serial.parseInt()];
     Color& color = m_rgColors[iLed];
     color.m_r = Serial.parseInt();
     color.m_g = Serial.parseInt();

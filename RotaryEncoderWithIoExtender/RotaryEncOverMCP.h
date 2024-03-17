@@ -31,19 +31,21 @@ public:
       RotaryTurnFunc turnFunc, SwitchPressedFunc switchPressedFunc, int id = 0)
     : rot(pinDT, pinCLK), 
       mcp(mcp),
-      pinA(pinDT), pinB(pinCLK), pinSW(pinSW),
+      pinDT(pinDT), pinCLK(pinCLK), pinSW(pinSW),
       turnFunc(turnFunc), m_switchPressedFunc(switchPressedFunc), id(id) {
     }
 
     /* Initialize object in the MCP */
     void init() {
         if(mcp != nullptr) {
-            mcp->pinMode(pinA, INPUT);
-            mcp->pullUp(pinA, 0); //disable pullup on this pin
-            mcp->setupInterruptPin(pinA,CHANGE);
-            mcp->pinMode(pinB, INPUT);
-            mcp->pullUp(pinB, 0); //disable pullup on this pin
-            mcp->setupInterruptPin(pinB,CHANGE);
+            mcp->pinMode(pinDT, INPUT);
+            mcp->pullUp(pinDT, 0); //disable pullup on this pin
+            mcp->setupInterruptPin(pinDT,CHANGE);
+
+            mcp->pinMode(pinCLK, INPUT);
+            mcp->pullUp(pinCLK, 0); //disable pullup on this pin
+            mcp->setupInterruptPin(pinCLK,CHANGE);
+            
             mcp->pinMode(pinSW, INPUT);
             mcp->pullUp(pinSW, 1); //enable pullup on this pin
             mcp->setupInterruptPin(pinSW,CHANGE);
@@ -52,9 +54,10 @@ public:
 
     /* On an interrupt, can be called with the value of the GPIOAB register (or INTCAP) */
     void feedInput(uint16_t gpioAB) {
-        uint8_t pinValA = bitRead(gpioAB, pinA);
-        uint8_t pinValB = bitRead(gpioAB, pinB);
-        uint8_t event = rot.process(pinValA, pinValB);
+        uint8_t pinValDT = bitRead(gpioAB, pinDT);
+        uint8_t pinValCLK = bitRead(gpioAB, pinCLK);
+        uint8_t event = rot.process(pinValDT, pinValCLK);
+
         if(event == DIR_CW || event == DIR_CCW) {
             //clock wise or counter-clock wise
             bool clockwise = event == DIR_CW;
@@ -74,6 +77,10 @@ public:
         {
           m_switchPressedFunc(id);
         }
+
+        char serialBuffer[255];
+        sprintf(serialBuffer, "A:%d B:%d E:%d SW:%d\n\n", pinValDT, pinValCLK, event, pinValSW);
+        Serial.write(serialBuffer);
     }
 
     /* Poll the encoder. Will cause an I2C transfer. */
@@ -94,8 +101,8 @@ public:
 private:
     Rotary rot;                         /* the rotary object which will be created*/
     Adafruit_MCP23017* mcp = nullptr;   /* pointer the I2C GPIO expander it's connected to */
-    uint8_t pinA = 0;
-    uint8_t pinB = 0;           /* the pin numbers for output A and output B */
+    uint8_t pinDT = 0;
+    uint8_t pinCLK = 0;           /* the pin numbers for output A and output B */
     uint8_t pinSW = 0;           /* the pin numbers for output A and output B */
     RotaryTurnFunc turnFunc = nullptr;  /* function pointer, will be called when there is an action happening */
     SwitchPressedFunc m_switchPressedFunc = nullptr;  

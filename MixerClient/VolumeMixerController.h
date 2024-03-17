@@ -12,7 +12,7 @@ enum class DeviceToClientEventType : int
 {
 	Button = 0, // a button is pressed
 	Dial = 1, // a dial is turned
-	HeatBeat = 2,
+	HeartBeat = 2,
 	StartUp = 0xEE5F69, // the device restarted
 };
 

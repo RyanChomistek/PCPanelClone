@@ -387,7 +387,7 @@ void VolumeMixerController::ReadInput()
 				states[dialId].m_Counter = cnt;
 				break;
 			}
-			case DeviceToClientEventType::HeatBeat:
+			case DeviceToClientEventType::HeartBeat:
 			{
 				// NOP
 			}

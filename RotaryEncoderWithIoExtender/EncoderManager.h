@@ -15,6 +15,9 @@
 /* variable to indicate that an interrupt has occured */
 volatile boolean awakenByInterrupt = false;
 
+class EncoderManager;
+EncoderManager* s_instance = nullptr;
+
 class EncoderManager
 {
 public:
@@ -22,16 +25,19 @@ static void RotaryEncoderChanged(Direction direction, int id, int count) {
     // Serial.println("Encoder " + String(id) + ": "
     //         + (clockwise ? String("clockwise") : String("counter-clock-wise")));
     char serialBuffer[255];
-    sprintf(serialBuffer, "%d %d %d %d\n", OutputEventType::Dial, id, direction, count);
+    sprintf(serialBuffer, "E:%d ID:%d dir:%d cnt:%d\n", OutputEventType::Dial, id, direction, count);
+    //sprintf(serialBuffer, "%d %d %d %d\n", OutputEventType::Dial, id, direction, count);
     Serial.write(serialBuffer);
+
+    s_instance->fAnyEncoderChanged = true;
 }
 
 static void RotaryEncoderSwitchPressed(int id)
 {
-  //Serial.println("pressed " + String(id));
-  char serialBuffer[255];
-  sprintf(serialBuffer, "%d %d\n", OutputEventType::Button, id);
-  Serial.write(serialBuffer);
+  Serial.println("pressed " + String(id));
+  // char serialBuffer[255];
+  // sprintf(serialBuffer, "%d %d\n", OutputEventType::Button, id);
+  // Serial.write(serialBuffer);
 }
 
 void setup()
@@ -57,6 +63,7 @@ void setup()
 
   attachInterrupt(digitalPinToInterrupt(arduinoIntPin), intCallBack, FALLING);
 
+  s_instance = this;
   // Serial.println("MCP23007 done setup");
 }
 
@@ -76,24 +83,31 @@ void checkInterrupt() {
 }
 
 void handleInterrupt(){
-    //An interrupt occurred on some MCP object.
-    //since all of them are ORed together, we don't
-    //know exactly which one has fired.
-    //just read all of them, pre-emptively.
+  //An interrupt occurred on some MCP object.
+  //since all of them are ORed together, we don't
+  //know exactly which one has fired.
+  //just read all of them, pre-emptively.
 
-    for(int j = 0; j < numMCPs; j++) {
-        uint16_t gpioAB = allMCPs[j]->readINTCAPAB();
-        // we need to read GPIOAB to clear the interrupt actually.
-        volatile uint16_t dummy = allMCPs[j]->readGPIOAB();
-        for (int i=0; i < numEncoders; i++) {
-            //only feed this in the encoder if this
-            //is coming from the correct MCP
-            if(rotaryEncoders[i].getMCP() == allMCPs[j])
-                rotaryEncoders[i].feedInput(gpioAB);
-        }
+  for(int j = 0; j < numMCPs; j++) {
+    uint16_t gpioAB = allMCPs[j]->readINTCAPAB();
+    // we need to read GPIOAB to clear the interrupt actually.
+    volatile uint16_t dummy = allMCPs[j]->readGPIOAB();
+    for (int i=0; i < numEncoders; i++) {
+      //only feed this in the encoder if this
+      //is coming from the correct MCP
+      if(rotaryEncoders[i].getMCP() == allMCPs[j])
+      {
+        // char serialBuffer[255];
+        // sprintf(serialBuffer, "Encoder:%d\n", i);
+        // Serial.write(serialBuffer);
+
+        rotaryEncoders[i].feedInput(gpioAB);
+      }
+            
     }
+  }
 
-    cleanInterrupts();
+  cleanInterrupts();
 }
 
 // handy for interrupts triggered by buttons
@@ -106,12 +120,15 @@ void cleanInterrupts(){
 }
 
 void loop() {
-    //Check if an interrupt has occurred and act on it
-    checkInterrupt();
+  fAnyEncoderChanged = false;
+
+  //Check if an interrupt has occurred and act on it
+  checkInterrupt();
 }
 
-private:
+ bool fAnyEncoderChanged = false;
 
+private:
   /* Our I2C MCP23017 GPIO expanders */
   Adafruit_MCP23017 mcp;
 
@@ -126,9 +143,11 @@ private:
   byte arduinoIntPin = 3;
 
   /* Array of all rotary encoders and their pins */
-  RotaryEncOverMCP rotaryEncoders[2] = {
-      RotaryEncOverMCP(&mcp, 6 /*pinDT*/, 7 /*pinCLK*/, 5 /*pinSW*/, &RotaryEncoderChanged, &RotaryEncoderSwitchPressed, 0),
-      RotaryEncOverMCP(&mcp, 3, 4, 2, &RotaryEncoderChanged, &RotaryEncoderSwitchPressed, 1),
+  RotaryEncOverMCP rotaryEncoders[4] = {
+      RotaryEncOverMCP(&mcp, 12 /*pinDT*/, 13 /*pinCLK*/, 11 /*pinSW*/, &RotaryEncoderChanged, &RotaryEncoderSwitchPressed, 0),
+      RotaryEncOverMCP(&mcp, 9 /*pinDT*/, 10 /*pinCLK*/, 8 /*pinSW*/, &RotaryEncoderChanged, &RotaryEncoderSwitchPressed, 1),
+      RotaryEncOverMCP(&mcp, 6 /*pinDT*/, 5 /*pinCLK*/, 7 /*pinSW*/, &RotaryEncoderChanged, &RotaryEncoderSwitchPressed, 2),
+      RotaryEncOverMCP(&mcp, 3 /*pinDT*/, 2 /*pinCLK*/, 4 /*pinSW*/, &RotaryEncoderChanged, &RotaryEncoderSwitchPressed, 3),
   };
   const int numEncoders = (int)(sizeof(rotaryEncoders) / sizeof(*rotaryEncoders));
 };

@@ -10,11 +10,12 @@ enum OutputEventType
 {
   Button = 0,
   Dial = 1,
-  StartUp = 2
+  HeartBeat = 2,
+  StartUp = 0xEE5F69,
 };
 
 enum InputEventType
 {
   color = 0,
-  brightness = 1
+  brightness = 1,
 };

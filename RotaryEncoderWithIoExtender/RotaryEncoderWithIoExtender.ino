@@ -4,6 +4,7 @@
 
 EncoderManager s_encoderManager;
 LedManager s_ledManager;
+unsigned long timeLastHeartBeat = 0;
 
 void setup(){
   Serial.begin(115200);
@@ -13,27 +14,39 @@ void setup(){
   Serial.print(OutputEventType::StartUp);
   Serial.print("\n");
   Serial.flush();
+
+  //timeLastHeartBeat = millis();
 }
 
-void loop() {
-    s_encoderManager.loop();
 
-    // handle serial input
-    while (Serial.available() > 0) 
+
+void loop() {
+  s_encoderManager.loop();
+
+  if(!s_encoderManager.fAnyEncoderChanged && millis() - timeLastHeartBeat > 1000)
+  {
+    timeLastHeartBeat = millis();
+    Serial.print(OutputEventType::HeartBeat);
+    Serial.print("\n");
+    Serial.flush();
+  }
+
+  // handle serial input
+  while (Serial.available() > 0) 
+  {
+    InputEventType inputEvent = (InputEventType) Serial.parseInt();
+    switch(inputEvent)
     {
-      InputEventType inputEvent = (InputEventType) Serial.parseInt();
-      switch(inputEvent)
+      case InputEventType::color:
       {
-        case InputEventType::color:
-        {
-          s_ledManager.UpdateLEDFromSerial();
-          break;
-        }
-        case InputEventType::brightness:
-        {
-          s_ledManager.UpdateBrightnessFromSerial();
-          break;
-        }
+        s_ledManager.UpdateLEDFromSerial();
+        break;
+      }
+      case InputEventType::brightness:
+      {
+        s_ledManager.UpdateBrightnessFromSerial();
+        break;
       }
     }
+  }
 }
