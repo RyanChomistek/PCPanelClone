@@ -54,33 +54,29 @@ public:
 
     /* On an interrupt, can be called with the value of the GPIOAB register (or INTCAP) */
     void feedInput(uint16_t gpioAB) {
-        uint8_t pinValDT = bitRead(gpioAB, pinDT);
-        uint8_t pinValCLK = bitRead(gpioAB, pinCLK);
-        uint8_t event = rot.process(pinValDT, pinValCLK);
+      uint8_t pinValDT = bitRead(gpioAB, pinDT);
+      uint8_t pinValCLK = bitRead(gpioAB, pinCLK);
+      uint8_t event = rot.process(pinValDT, pinValCLK);
 
-        if(event == DIR_CW || event == DIR_CCW) {
-            //clock wise or counter-clock wise
-            bool clockwise = event == DIR_CW;
-            Direction direction = clockwise ? Direction::CW : Direction::CCW;
+      if(event == DIR_CW || event == DIR_CCW) {
+        //clock wise or counter-clock wise
+        bool clockwise = event == DIR_CW;
+        Direction direction = clockwise ? Direction::CW : Direction::CCW;
 
-            m_cnt += clockwise ? 1 : -1;
+        m_cnt += clockwise ? 1 : -1;
 
-            //Call into action function if registered
-            if(turnFunc) {
-                turnFunc(direction, id, m_cnt);
-                return;
-            }
+        //Call into action function if registered
+        if(turnFunc) {
+          turnFunc(direction, id, m_cnt);
+          return;
         }
+      }
 
-        uint8_t pinValSW = bitRead(gpioAB, pinSW);
-        if(pinValSW == 0)
-        {
-          m_switchPressedFunc(id);
-        }
-
-        char serialBuffer[255];
-        sprintf(serialBuffer, "A:%d B:%d E:%d SW:%d\n\n", pinValDT, pinValCLK, event, pinValSW);
-        Serial.write(serialBuffer);
+      uint8_t pinValSW = bitRead(gpioAB, pinSW);
+      if(pinValSW == 0)
+      {
+        m_switchPressedFunc(id);
+      }
     }
 
     /* Poll the encoder. Will cause an I2C transfer. */
