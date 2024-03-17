@@ -22,11 +22,8 @@ class EncoderManager
 {
 public:
 static void RotaryEncoderChanged(Direction direction, int id, int count) {
-    // Serial.println("Encoder " + String(id) + ": "
-    //         + (clockwise ? String("clockwise") : String("counter-clock-wise")));
     char serialBuffer[255];
-    sprintf(serialBuffer, "E:%d ID:%d dir:%d cnt:%d\n", OutputEventType::Dial, id, direction, count);
-    //sprintf(serialBuffer, "%d %d %d %d\n", OutputEventType::Dial, id, direction, count);
+    sprintf(serialBuffer, "%ld %d %d %d\n", OutputEventType::Dial, id, direction, count);
     Serial.write(serialBuffer);
 
     s_instance->fAnyEncoderChanged = true;
@@ -34,10 +31,9 @@ static void RotaryEncoderChanged(Direction direction, int id, int count) {
 
 static void RotaryEncoderSwitchPressed(int id)
 {
-  Serial.println("pressed " + String(id));
-  // char serialBuffer[255];
-  // sprintf(serialBuffer, "%d %d\n", OutputEventType::Button, id);
-  // Serial.write(serialBuffer);
+  char serialBuffer[255];
+  sprintf(serialBuffer, "%ld %d\n", OutputEventType::Button, id);
+  Serial.write(serialBuffer);
 }
 
 void setup()
@@ -97,10 +93,6 @@ void handleInterrupt(){
       //is coming from the correct MCP
       if(rotaryEncoders[i].getMCP() == allMCPs[j])
       {
-        // char serialBuffer[255];
-        // sprintf(serialBuffer, "Encoder:%d\n", i);
-        // Serial.write(serialBuffer);
-
         rotaryEncoders[i].feedInput(gpioAB);
       }
             
