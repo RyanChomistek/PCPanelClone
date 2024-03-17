@@ -11,11 +11,11 @@ void setup(){
   s_encoderManager.setup();
   s_ledManager.Setup(9);
 
-  Serial.print(OutputEventType::StartUp);
+  Serial.print(static_cast<long int>(OutputEventType::StartUp));
   Serial.print("\n");
   Serial.flush();
 
-  //timeLastHeartBeat = millis();
+  timeLastHeartBeat = millis();
 }
 
 
@@ -26,7 +26,7 @@ void loop() {
   if(!s_encoderManager.fAnyEncoderChanged && millis() - timeLastHeartBeat > 1000)
   {
     timeLastHeartBeat = millis();
-    Serial.print(OutputEventType::HeartBeat);
+    Serial.print(static_cast<long int>(OutputEventType::HeartBeat));
     Serial.print("\n");
     Serial.flush();
   }

@@ -6,7 +6,7 @@ enum Direction
   CW = 1
 };
 
-enum OutputEventType
+enum class OutputEventType: long int
 {
   Button = 0,
   Dial = 1,
