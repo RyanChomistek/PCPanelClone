@@ -14,10 +14,14 @@
 #include <tchar.h>
 #include <windows.h>
 #include <mutex>
+#include <algorithm>
 
 #include "VolumeMixerController.h"
 
 #pragma comment(lib, "shell32.lib")
+
+#undef max
+#undef min
 
 using namespace nlohmann::literals;
 
@@ -94,8 +98,9 @@ void PrintVolumes()
 /// <summary>
 /// offsets the volume of a specific process by volumeDelta amount
 /// </summary>
-void SetVolume(const std::wstring& processName, float volumeDelta)
+float SetVolume(const std::wstring& processName, float volumeDelta)
 {
+	float newVolume = -1;
 	IMMDevice* pDevice = NULL;
 	IMMDeviceEnumerator* pEnumerator = NULL;
 	IAudioSessionControl* pSessionControl = NULL;
@@ -123,6 +128,8 @@ void SetVolume(const std::wstring& processName, float volumeDelta)
 	int cbSessionCount = 0;
 	IfFailThrow(pSessionList->GetCount(&cbSessionCount));
 
+	bool foundProcess = false;
+
 	// loop through all of the sessions and check if any are the process we are looking for
 	// NOTE: we don't return early in this loop even if we found the process we are looking for because some processes have more than one session (i.e. discord and teams)
 	for (int index = 0; index < cbSessionCount; index++)
@@ -146,6 +153,7 @@ void SetVolume(const std::wstring& processName, float volumeDelta)
 				std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\")+1);
 				if (wcsstr(wsImageName, processName.c_str()) != NULL)
 				{
+					foundProcess = true;
 					// if the name matches what we were looking for then get the volume interface
 					std::wcout << executableName << " " << processName << std::endl;
 					ISimpleAudioVolume* pSimpleAudioVolume;
@@ -160,7 +168,7 @@ void SetVolume(const std::wstring& processName, float volumeDelta)
 					volume += volumeDelta;
 
 					// make sure we don't set it greater than 1 (if it is > 1 then windows will toss the input)
-					float newVolume = max(min(volume, 1), 0);
+					newVolume = std::max(std::min(volume, 1.0f), 0.0f);
 
 					// Set the volume
 					pSimpleAudioVolume->SetMasterVolume(newVolume, NULL);
@@ -169,12 +177,14 @@ void SetVolume(const std::wstring& processName, float volumeDelta)
 			CloseHandle(hProcess);
 		}
 	}
+
+	return newVolume;
 }
 
 /// <summary>
 /// offsets the master volume by volumeDelta amount
 /// </summary>
-void SetMasterVolume(float volumeDelta)
+float SetMasterVolume(float volumeDelta)
 {
 	IfFailThrow(CoInitialize(NULL));
 
@@ -201,15 +211,18 @@ void SetMasterVolume(float volumeDelta)
 	volume += volumeDelta;
 
 	// set the volume to an offset from the current value
-	float newVolume = max(min(volume, 1), 0);
+	float newVolume = std::max(std::min(volume, 1.0f), 0.0f);
 	endpointVolume->SetMasterVolumeLevelScalar(newVolume, NULL);
+
+	return newVolume;
 }
 
 /// <summary>
 /// offsets the focused window volume by volumeDelta amount
 /// </summary>
-void SetFocusedVolume(float volumeDelta)
+float SetFocusedVolume(float volumeDelta)
 {
+	float newVolume = -1;
 	HWND wndFocused = GetForegroundWindow();
 
 	DWORD pid = NULL;
@@ -217,7 +230,7 @@ void SetFocusedVolume(float volumeDelta)
 
 	if (tid == 0)
 	{
-		return;
+		return -1;
 	}
 
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -228,10 +241,12 @@ void SetFocusedVolume(float volumeDelta)
 		if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
 		{
 			std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\") + 1);
-			SetVolume(executableName, volumeDelta);
+			newVolume = SetVolume(executableName, volumeDelta);
 		}
 		CloseHandle(hProcess);
 	}
+
+	return newVolume;
 }
 
 VolumeMixerController::VolumeMixerController()
@@ -370,21 +385,26 @@ void VolumeMixerController::ReadInput()
 				std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
 
 				int deltaCnt = cnt - states[dialId].m_Counter;
-
+				float newVolume = -1;
 				switch (states[dialId].m_targetType)
 				{
-				case TargetType::Process:
-					for (std::wstring processName : states[dialId].m_vecProcessNames)
-						SetVolume(processName, deltaCnt * singleTickRotationAmount);
-					break;
-				case TargetType::All:
-					SetMasterVolume(deltaCnt * singleTickRotationAmount);
-					break;
-				case TargetType::Focus:
-					SetFocusedVolume(deltaCnt * singleTickRotationAmount);
+					case TargetType::Process:
+						for (std::wstring processName : states[dialId].m_vecProcessNames)
+						{
+							newVolume = std::max(newVolume, SetVolume(processName, deltaCnt * singleTickRotationAmount));
+						}
+							
+						break;
+					case TargetType::All:
+						newVolume = SetMasterVolume(deltaCnt * singleTickRotationAmount);
+						break;
+					case TargetType::Focus:
+						newVolume = SetFocusedVolume(deltaCnt * singleTickRotationAmount);
 				}
 
 				states[dialId].m_Counter = cnt;
+				if(newVolume >= 0)
+					FlashEncoderVolumeToLeds(states[dialId], newVolume);
 				break;
 			}
 			case DeviceToClientEventType::HeartBeat:
@@ -393,6 +413,15 @@ void VolumeMixerController::ReadInput()
 				std::stringstream ssOut;
 				ssOut << (int)ClientToDeviceEventType::HeartBeat;
 				m_serial.Write(ssOut.str().c_str(), ssOut.str().size());
+
+				time_t now;
+				time(&now);
+				if (encoderFlashingStart.has_value() && difftime(now, *encoderFlashingStart) > 1)
+				{
+					WriteColorData();
+					encoderFlashingStart = std::nullopt;
+				}
+
 				break;
 			}
 		}
@@ -400,6 +429,37 @@ void VolumeMixerController::ReadInput()
 		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('\n') + 1, m_currentReadBuffer.length());
 		std::cout << token << '\n';
 	}
+}
+
+void VolumeMixerController::FlashEncoderVolumeToLeds(const DialState& state, float volume)
+{
+	std::stringstream ss;
+	volume *= numDials;
+	for (int iLed = 0; iLed < numDials; iLed++)
+	{
+		if (volume >= 1)
+		{
+			ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << state.r << " " << state.g << " " << state.b << "\n";
+		}
+		else if (volume < 0)
+		{
+			ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << 0 << " " << 0 << " " << 0 << "\n";
+		}
+		else
+		{
+			int r = (int)(state.r * volume);
+			int g = (int)(state.g * volume);
+			int b = (int)(state.b * volume);
+			ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << r << " " << g << " " << b << "\n";
+		}
+
+		volume -= 1;
+	}
+
+	std::cout << ss.str() << "\n";
+	m_serial.Write(ss.str().c_str(), ss.str().size());
+	std::time_t now;
+	encoderFlashingStart = time(&now);
 }
 
 void VolumeMixerController::WriteColorData()

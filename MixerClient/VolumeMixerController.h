@@ -4,6 +4,7 @@
 #include <audioclient.h>
 #include "StandardSerialReader.h"
 #include <mutex>
+#include <optional>
 
 /// <summary>
 /// specifies what event is being sent from device to client
@@ -53,14 +54,6 @@ public:
 	void ReadInput() final;
 
 private:
-
-	/// <summary>
-	/// sends color data to the device
-	/// </summary>
-	void WriteColorData();
-	void OnConnected() final;
-
-private:
 	struct DialState
 	{
 		int m_Counter;
@@ -69,8 +62,22 @@ private:
 		int r, g, b;
 	};
 
+private:
+
+	/// <summary>
+	/// sends color data to the device
+	/// </summary>
+	void WriteColorData();
+	void OnConnected() final;
+
+	void FlashEncoderVolumeToLeds(const DialState&, float volumn);
+
+
+
 	static constexpr int numDials = 4;
 	static constexpr float singleTickRotationAmount = .05f;
 	DialState states[numDials];
 	std::once_flag fFirstMessage;
+
+	std::optional<std::time_t> encoderFlashingStart;
 };
