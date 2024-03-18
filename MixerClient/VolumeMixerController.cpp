@@ -269,21 +269,21 @@ VolumeMixerController::VolumeMixerController()
 				[
 					{
 						"Target":3,
-						"Color": [2,0,0]
+						"Color": [255,0,0]
 					},
 					{
 						"Target":1,
-						"Color": [0,2,0]
+						"Color": [0,255,0]
 					},
 					{
 						"Target":0,
-						"Processes":["firefox.exe", "msedge.exe"],
-						"Color": [0,0,2]
+						"Processes":["firefox.exe", "msedge.exe", "chrome.exe"],
+						"Color": [0,0,255]
 					},
 					{
 						"Target":0,
 						"Processes":["Discord.exe", "teams.exe"],
-						"Color": [2,0,1]
+						"Color": [128,0,128]
 					}
 				]
 			})"_json;
