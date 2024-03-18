@@ -33,19 +33,15 @@ public:
 
   void UpdateLEDFromSerial()
   {
-    if(Serial.available() == 0)
-    {
-      return;
-    }
-
     int iLed = softwareIdToPhysicalIdMap[Serial.parseInt()];
     Color& color = m_rgColors[iLed];
     color.m_r = Serial.parseInt();
     color.m_g = Serial.parseInt();
     color.m_b = Serial.parseInt();
     
-    // the input will have a trailing "n" that we can just drop
-    Serial.read();
+    char serialBuffer[255];
+    sprintf(serialBuffer, "ID: %d, RGB: %d, %d, %d|", iLed, color.m_r, color.m_g, color.m_b);
+    Serial.write(serialBuffer);
 
     ShowLeds();
   }
@@ -77,6 +73,18 @@ public:
       SetLedColor(iLed);
     }
 
+    m_leds.show();
+  }
+
+  // clears the physical LEDs, but doesn't wipe the state of the leds
+  void TemporaryClearLEDs()
+  {
+    for (int iLed = 0; iLed < c_cLed; iLed++)
+    {
+      m_leds.setPixelColor(iLed, 0, 0, 0);
+    }
+
+    m_leds.setBrightness(m_brightness);
     m_leds.show();
   }
 

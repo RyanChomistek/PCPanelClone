@@ -15,9 +15,6 @@
 /* variable to indicate that an interrupt has occured */
 volatile boolean awakenByInterrupt = false;
 
-class EncoderManager;
-EncoderManager* s_instance = nullptr;
-
 class EncoderManager
 {
 public:
@@ -25,8 +22,6 @@ static void RotaryEncoderChanged(Direction direction, int id, int count) {
     char serialBuffer[255];
     sprintf(serialBuffer, "%ld %d %d %d\n", OutputEventType::Dial, id, direction, count);
     Serial.write(serialBuffer);
-
-    s_instance->fAnyEncoderChanged = true;
 }
 
 static void RotaryEncoderSwitchPressed(int id)
@@ -43,8 +38,6 @@ void setup()
   mcp.begin();      // use default address 0
   mcp.readINTCAPAB(); //read this so that the interrupt is cleared
 
-  // Serial.println("MCP23007 Interrupt Cleared");
-
   //initialize all rotary encoders
 
   //Setup interrupts, OR INTA, INTB together on both ports.
@@ -58,9 +51,6 @@ void setup()
   }
 
   attachInterrupt(digitalPinToInterrupt(arduinoIntPin), intCallBack, FALLING);
-
-  s_instance = this;
-  // Serial.println("MCP23007 done setup");
 }
 
 // The int handler will just signal that the int has happened
@@ -71,14 +61,16 @@ static void INTERRUPT_FUNC_ATTRIB intCallBack() {
 
 void checkInterrupt() {
     if(awakenByInterrupt) {
-        // disable interrupts while handling them.
-        detachInterrupt(digitalPinToInterrupt(arduinoIntPin));
-        handleInterrupt();
-        attachInterrupt(digitalPinToInterrupt(arduinoIntPin),intCallBack,FALLING);
+      // disable interrupts while handling them.
+      detachInterrupt(digitalPinToInterrupt(arduinoIntPin));
+      handleInterrupt();
+      attachInterrupt(digitalPinToInterrupt(arduinoIntPin),intCallBack,FALLING);
     }
 }
 
 void handleInterrupt(){
+  fAnyEncoderChanged = true;
+
   //An interrupt occurred on some MCP object.
   //since all of them are ORed together, we don't
   //know exactly which one has fired.

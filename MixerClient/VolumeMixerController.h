@@ -23,6 +23,7 @@ enum class ClientToDeviceEventType : int
 {
 	Color = 0, // color event, the client is sending what colors the device should show on its LEDs
 	Brightness = 1,
+	HeartBeat = 2,
 };
 
 enum class Direction: int

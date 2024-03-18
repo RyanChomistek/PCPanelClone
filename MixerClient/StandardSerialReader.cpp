@@ -98,7 +98,7 @@ HRESULT StandardSerialReader::HrReadLoop()
 	do
 	{
 		// Wait for an event
-		lLastError = m_serial.WaitEvent(0, 2000);
+		lLastError = m_serial.WaitEvent(0, 5000);
 		if (lLastError != ERROR_SUCCESS)
 		{
 			return lLastError;

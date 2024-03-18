@@ -390,11 +390,15 @@ void VolumeMixerController::ReadInput()
 			case DeviceToClientEventType::HeartBeat:
 			{
 				// NOP
+				std::stringstream ssOut;
+				ssOut << (int)ClientToDeviceEventType::HeartBeat;
+				m_serial.Write(ssOut.str().c_str(), ssOut.str().size());
+				break;
 			}
 		}
 
-		std::cout << token << '\n';
 		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('\n') + 1, m_currentReadBuffer.length());
+		std::cout << token << '\n';
 	}
 }
 

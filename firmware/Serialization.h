@@ -18,4 +18,5 @@ enum InputEventType
 {
   color = 0,
   brightness = 1,
+  HeartBeat = 2,
 };
