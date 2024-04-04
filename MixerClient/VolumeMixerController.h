@@ -72,7 +72,9 @@ private:
 
 	void FlashEncoderVolumeToLeds(const DialState&, float volumn);
 
-
+	float SetMasterVolume(float volumeDelta);
+	float SetVolume(const std::wstring& processName, float volumeDelta);
+	float SetFocusedVolume(float volumeDelta);
 
 	static constexpr int numDials = 4;
 	static constexpr float singleTickRotationAmount = .05f;

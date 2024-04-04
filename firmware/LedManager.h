@@ -17,7 +17,7 @@ struct Color
 };
 
 // I done messed up on the PCB and flipped led's 1 and 2
-int softwareIdToPhysicalIdMap[4] = {0, 2, 1, 3};
+int softwareIdToPhysicalIdMap[4] = {0, 1, 2, 3};
 
 class LedManager
 {

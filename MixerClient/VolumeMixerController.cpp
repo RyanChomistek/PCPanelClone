@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <mutex>
 #include <algorithm>
+#include "scope_guard.h"
 
 #include "VolumeMixerController.h"
 
@@ -22,6 +23,8 @@
 
 #undef max
 #undef min
+
+static bool s_fEnableLogging = false;
 
 using namespace nlohmann::literals;
 
@@ -63,12 +66,17 @@ void PrintVolumes()
 
 	IfFailThrow(pSessionManager->GetSessionEnumerator(&pSessionList));
 	IfFailThrow(pSessionList->GetCount(&cbSessionCount));
-	std::cout << cbSessionCount << std::endl;
+	
+	if (s_fEnableLogging)
+		std::cout << cbSessionCount << std::endl;
+	
 	for (int index = 0; index < cbSessionCount; index++)
 	{
 		IfFailThrow(pSessionList->GetSession(index, &pSessionControl));
 		IfFailThrow(pSessionControl->GetDisplayName(&pswSession));
-		std::wcout << "Session Name: " << pswSession << std::endl;
+
+		if (s_fEnableLogging)
+			std::wcout << "Session Name: " << pswSession << std::endl;
 
 		IfFailThrow(pSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pSessionControl2));
 
@@ -81,32 +89,69 @@ void PrintVolumes()
 			DWORD nSize = MAX_PATH;
 			if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
 			{
-				std::wcout << wsImageName << std::endl;
+				if (s_fEnableLogging)
+					std::wcout << wsImageName << std::endl;
 
 				ISimpleAudioVolume* pSimpleAudioVolume;
 				IfFailThrow(pSessionControl2->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&pSimpleAudioVolume));
 
 				float volume = 0;
 				pSimpleAudioVolume->GetMasterVolume(&volume);
-				std::cout << volume << std::endl;
+				if (s_fEnableLogging)
+					std::cout << volume << std::endl;
 			}
 			CloseHandle(hProcess);
 		}
 	}
 }
 
+template <class T>
+class Destroyer
+{
+public:
+	Destroyer(T* p)
+		: m_p(p)
+	{}
+
+	Destroyer() = default;
+
+	~Destroyer()
+	{
+		m_p->Release();
+		m_p = nullptr;
+	}
+
+	T* operator->() const
+	{
+		return m_p;
+	}
+
+	T& operator*() const
+	{
+		return *m_p;
+	}
+
+	T** operator&()
+	{
+		return &m_p;
+	}
+
+	T* m_p = nullptr;
+};
+
 /// <summary>
 /// offsets the volume of a specific process by volumeDelta amount
 /// </summary>
-float SetVolume(const std::wstring& processName, float volumeDelta)
+float VolumeMixerController::SetVolume(const std::wstring& processName, float volumeDelta)
 {
 	float newVolume = -1;
-	IMMDevice* pDevice = NULL;
-	IMMDeviceEnumerator* pEnumerator = NULL;
-	IAudioSessionControl* pSessionControl = NULL;
-	IAudioSessionControl2* pSessionControl2 = NULL;
-	IAudioSessionManager2* pSessionManager = NULL;
 
+	Destroyer<IMMDevice> pDevice;
+	Destroyer<IMMDeviceEnumerator> pEnumerator;
+	Destroyer<IAudioSessionManager2> pSessionManager;
+	Destroyer<IAudioSessionEnumerator> pSessionList;
+
+	// get the list of audio sessions (all the processes that are outputing audio)
 	IfFailThrow(CoInitialize(NULL))
 
 	// Create the device enumerator.
@@ -122,9 +167,8 @@ float SetVolume(const std::wstring& processName, float volumeDelta)
 		CLSCTX_ALL,
 		NULL, (void**)&pSessionManager));
 
-	// get the list of audio sessions (all the processes that are outputing audio)
-	IAudioSessionEnumerator* pSessionList = NULL;
 	IfFailThrow(pSessionManager->GetSessionEnumerator(&pSessionList));
+	
 	int cbSessionCount = 0;
 	IfFailThrow(pSessionList->GetCount(&cbSessionCount));
 
@@ -134,6 +178,9 @@ float SetVolume(const std::wstring& processName, float volumeDelta)
 	// NOTE: we don't return early in this loop even if we found the process we are looking for because some processes have more than one session (i.e. discord and teams)
 	for (int index = 0; index < cbSessionCount; index++)
 	{
+		Destroyer<IAudioSessionControl> pSessionControl;
+		Destroyer<IAudioSessionControl2> pSessionControl2;
+
 		// Get the session from the list
 		IfFailThrow(pSessionList->GetSession(index, &pSessionControl));
 		IfFailThrow(pSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pSessionControl2));
@@ -150,19 +197,24 @@ float SetVolume(const std::wstring& processName, float volumeDelta)
 			if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
 			{
 				// find just the executable name
-				std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\")+1);
+				std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\") + 1);
 				if (wcsstr(wsImageName, processName.c_str()) != NULL)
 				{
 					foundProcess = true;
+
 					// if the name matches what we were looking for then get the volume interface
-					std::wcout << executableName << " " << processName << std::endl;
-					ISimpleAudioVolume* pSimpleAudioVolume;
+					if (s_fEnableLogging)
+						std::wcout << executableName << " " << processName << std::endl;
+
+					Destroyer<ISimpleAudioVolume> pSimpleAudioVolume;
 					IfFailThrow(pSessionControl2->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&pSimpleAudioVolume));
 
 					// find the current volume
 					float volume = 0;
 					pSimpleAudioVolume->GetMasterVolume(&volume);
-					std::cout << volume << " " << volumeDelta << std::endl;
+					
+					if (s_fEnableLogging)
+						std::cout << volume << " " << volumeDelta << std::endl;
 
 					// offset it be the delta
 					volume += volumeDelta;
@@ -184,30 +236,27 @@ float SetVolume(const std::wstring& processName, float volumeDelta)
 /// <summary>
 /// offsets the master volume by volumeDelta amount
 /// </summary>
-float SetMasterVolume(float volumeDelta)
+float VolumeMixerController::SetMasterVolume(float volumeDelta)
 {
 	IfFailThrow(CoInitialize(NULL));
 
 	// get the device enumerator
-	IMMDeviceEnumerator* deviceEnumerator = NULL;
+	Destroyer<IMMDeviceEnumerator> deviceEnumerator;
 	IfFailThrow(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator));
 	
 	// grab the default device
-	IMMDevice* defaultDevice = NULL;
+	Destroyer<IMMDevice> defaultDevice;
 	IfFailThrow(deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice));
-	deviceEnumerator->Release();
-	deviceEnumerator = NULL;
 
 	// get the audio endpoint interface from the device
-	IAudioEndpointVolume* endpointVolume = NULL;
+	Destroyer<IAudioEndpointVolume> endpointVolume;
 	IfFailThrow(defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID*)&endpointVolume));
-	defaultDevice->Release();
-	defaultDevice = NULL;
 
 	// get the master volume
 	float volume = 0;
 	endpointVolume->GetMasterVolumeLevelScalar(&volume);
-	std::cout << volume << " " << volumeDelta << std::endl;
+	if (s_fEnableLogging)
+		std::cout << volume << " " << volumeDelta << std::endl;
 	volume += volumeDelta;
 
 	// set the volume to an offset from the current value
@@ -220,7 +269,7 @@ float SetMasterVolume(float volumeDelta)
 /// <summary>
 /// offsets the focused window volume by volumeDelta amount
 /// </summary>
-float SetFocusedVolume(float volumeDelta)
+float VolumeMixerController::SetFocusedVolume(float volumeDelta)
 {
 	float newVolume = -1;
 	HWND wndFocused = GetForegroundWindow();
@@ -343,7 +392,8 @@ void VolumeMixerController::ReadInput()
 	while (m_currentReadBuffer.find('|') != std::string::npos)
 	{
 		std::string comment = m_currentReadBuffer.substr(0, m_currentReadBuffer.find('|'));
-		std::cout << "<" << comment << ">" << '\n';
+		if (s_fEnableLogging)
+			std::cout << "<" << comment << ">" << '\n';
 		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('|') + 1, m_currentReadBuffer.length());
 	}
 
@@ -368,21 +418,25 @@ void VolumeMixerController::ReadInput()
 		switch (type)
 		{
 			case DeviceToClientEventType::StartUp:
-				std::cout << "Start up" << '\n';
+				if (s_fEnableLogging)
+					std::cout << "Start up" << '\n';
 				WriteColorData();
 				break;
 			case DeviceToClientEventType::Button:
 			{
 				int dialId;
 				ss >> dialId;
-				std::cout << "btn id:" << dialId << '\n';
+				if (s_fEnableLogging)
+					std::cout << "btn id:" << dialId << '\n';
 				break;
 			}
 			case DeviceToClientEventType::Dial:
 			{
 				int dialId, dir, cnt;
 				ss >> dialId >> dir >> cnt;
-				std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
+
+				if (s_fEnableLogging)
+					std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
 
 				int deltaCnt = cnt - states[dialId].m_Counter;
 				float newVolume = -1;
@@ -427,7 +481,9 @@ void VolumeMixerController::ReadInput()
 		}
 
 		m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('\n') + 1, m_currentReadBuffer.length());
-		std::cout << token << '\n';
+
+		if (s_fEnableLogging)
+			std::cout << token << '\n';
 	}
 }
 
@@ -456,7 +512,8 @@ void VolumeMixerController::FlashEncoderVolumeToLeds(const DialState& state, flo
 		volume -= 1;
 	}
 
-	std::cout << ss.str() << "\n";
+	if (s_fEnableLogging)
+		std::cout << ss.str() << "\n";
 	m_serial.Write(ss.str().c_str(), ss.str().size());
 	std::time_t now;
 	encoderFlashingStart = time(&now);
@@ -472,7 +529,8 @@ void VolumeMixerController::WriteColorData()
 		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << "\n";
 	}
 
-	std::cout << ss.str() << "\n";
+	if (s_fEnableLogging)
+		std::cout << ss.str() << "\n";
 	m_serial.Write(ss.str().c_str(), ss.str().size());
 }
 
