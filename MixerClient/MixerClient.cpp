@@ -21,7 +21,13 @@ int main()
 			}
 
 			std::wcout << L"connecting to " << port << '\n';
-			IfFailRet(reader.HrReadLoop());
+
+			// if we disconnect in hrReadLoop it might just be that the PC went to sleep or we otherwise dropped the connection
+			// keep retrying to connect
+			if (FAILED(reader.HrReadLoop()))
+			{
+				continue;
+			}
 		}
 
 		// we didn't find the mixer, wait a second and try again
