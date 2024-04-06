@@ -452,7 +452,36 @@ float VolumeMixerController::SetFocusedVolume(float volumeDelta)
 	return newVolume;
 }
 
-bool ToggleMute(const std::wstring& processName)
+bool VolumeMixerController::ToggleFocusedMute()
+{
+	float newVolume = -1;
+	HWND wndFocused = GetForegroundWindow();
+
+	DWORD pid = NULL;
+	DWORD tid = GetWindowThreadProcessId(wndFocused, &pid);
+
+	if (tid == 0)
+	{
+		return -1;
+	}
+
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (hProcess != NULL)
+	{
+		WCHAR wsImageName[MAX_PATH + 1];
+		DWORD nSize = MAX_PATH;
+		if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
+		{
+			std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\") + 1);
+			ToggleMute(executableName);
+		}
+		CloseHandle(hProcess);
+	}
+
+	return newVolume;
+}
+
+bool VolumeMixerController::ToggleMute(const std::wstring& processName)
 {
 	bool foundProcess = false;
 	BOOL selectedMuteSetting = false;
@@ -464,8 +493,6 @@ bool ToggleMute(const std::wstring& processName)
 		{
 			continue;
 		}
-
-		
 
 		Holder<ISimpleAudioVolume*, IUnknownReleaser<ISimpleAudioVolume>> audioVolume = std::move(iter.GetAudioVolume());
 
@@ -480,7 +507,31 @@ bool ToggleMute(const std::wstring& processName)
 
 		foundProcess = true;
 	}
-	return 0;
+
+	return false;
+}
+
+bool VolumeMixerController::ToggleMasterMute()
+{
+	IfFailThrow(CoInitialize(NULL));
+
+	// get the device enumerator
+	Holder<IMMDeviceEnumerator*, IUnknownReleaser<IMMDeviceEnumerator>> deviceEnumerator;
+	IfFailThrow(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator));
+
+	// grab the default device
+	Holder<IMMDevice*, IUnknownReleaser<IMMDevice>> defaultDevice;
+	IfFailThrow(deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice));
+
+	// get the audio endpoint interface from the device
+	Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume;
+	IfFailThrow(defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID*)&endpointVolume));
+
+	BOOL fMute = false;
+	IfFailThrow(endpointVolume->GetMute(&fMute));
+	IfFailThrow(endpointVolume->SetMute(!fMute, nullptr));
+
+	return false;
 }
 
 VolumeMixerController::VolumeMixerController()
@@ -611,8 +662,27 @@ void VolumeMixerController::ReadInput()
 			{
 				int dialId;
 				ss >> dialId;
+
 				if (s_fEnableLogging)
 					std::cout << "btn id:" << dialId << '\n';
+
+				switch (states[dialId].m_targetType)
+				{
+					case TargetType::Process:
+						for (std::wstring processName : states[dialId].m_vecProcessNames)
+						{
+							ToggleMute(processName);
+						}
+
+						break;
+					case TargetType::All:
+						ToggleMasterMute();
+						break;
+					case TargetType::Focus:
+						ToggleFocusedMute();
+						break;
+				}
+
 				break;
 			}
 			case DeviceToClientEventType::Dial:
