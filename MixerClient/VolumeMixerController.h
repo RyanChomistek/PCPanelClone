@@ -75,6 +75,7 @@ private:
 	float SetMasterVolume(float volumeDelta);
 	float SetVolume(const std::wstring& processName, float volumeDelta);
 	float SetFocusedVolume(float volumeDelta);
+	bool ToggleMute(const std::wstring& processName);
 
 	static constexpr int numDials = 4;
 	static constexpr float singleTickRotationAmount = .05f;
