@@ -239,31 +239,52 @@ struct AudioSessions
 			: m_audioSessions(audioSessions)
 		{
 			IfFailThrow(audioSessions.m_pSessionList->GetCount(&m_cSessions));
+			GetCurrentSessionInfo();
 		}
 
 		AudioSessionIterator(AudioSessions& audioSessions, int iSession)
 			: m_audioSessions(audioSessions), m_iSession(iSession)
 		{
 			IfFailThrow(audioSessions.m_pSessionList->GetCount(&m_cSessions));
+			GetCurrentSessionInfo();
+		}
+
+		void GetCurrentSessionInfo()
+		{
+			clear();
+
+			while (m_hProcess == nullptr)
+			{
+				if (0 > m_iSession || m_iSession >= m_cSessions)
+				{
+					return;
+				}
+
+				// Get the session from the list
+				IfFailThrow(m_audioSessions.m_pSessionList->GetSession(m_iSession, &m_pSessionControl));
+				IfFailThrow(m_pSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&m_pSessionControl2));
+				m_hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, GetProcessID());
+
+				if (m_hProcess == nullptr)
+				{
+					clear();
+					++m_iSession;
+				}
+			}
+
 		}
 
 		AudioSessionIterator& operator++()
 		{
 			++m_iSession;
 
-			m_pSessionControl.Release();
-			m_pSessionControl2.Release();
-			m_hProcess.Release();
-			
+			GetCurrentSessionInfo();
+
 			if (m_iSession >= m_cSessions)
 			{
 				return *this;
 			}
 
-			// Get the session from the list
-			IfFailThrow(m_audioSessions.m_pSessionList->GetSession(m_iSession, &m_pSessionControl));
-			IfFailThrow(m_pSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&m_pSessionControl2));
-			m_hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, GetProcessID());
 			return *this;
 		}
 
@@ -287,12 +308,14 @@ struct AudioSessions
 		{
 			if (!HasProcess())
 			{
-				return nullptr;
+				wsImageName[0] = '\0';
+				return wsImageName;
 			}
 
 			if (!QueryFullProcessImageNameW(m_hProcess.m_p, NULL, wsImageName, &nSize))
 			{
-				return nullptr;
+				wsImageName[0] = '\0';
+				return wsImageName;
 			}
 
 			return wsImageName;
@@ -319,6 +342,15 @@ struct AudioSessions
 
 		WCHAR wsImageName[MAX_PATH + 1];
 		DWORD nSize = MAX_PATH;
+
+		private:
+			void clear()
+			{
+				m_pSessionControl.Release();
+				m_pSessionControl2.Release();
+				m_hProcess.Release();
+				wsImageName[0] = '\0';
+			}
 	};
 
 	AudioSessionIterator begin()
@@ -346,7 +378,8 @@ float VolumeMixerController::SetVolume(const std::wstring& processName, float vo
 	// NOTE: we don't return early in this loop even if we found the process we are looking for because some processes have more than one session (i.e. discord and teams)
 	for(; iter != sessions.end(); ++iter)
 	{
-		if (!iter.HasProcess() || wcsstr(iter.GetProcessPath(), processName.c_str()) == nullptr)
+		const WCHAR* szProcessPath = iter.GetProcessPath();
+		if (!iter.HasProcess() || wcsstr(szProcessPath, processName.c_str()) == nullptr)
 		{
 			continue;
 		}
@@ -462,7 +495,7 @@ bool VolumeMixerController::ToggleFocusedMute()
 
 	if (tid == 0)
 	{
-		return -1;
+		return false;
 	}
 
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
