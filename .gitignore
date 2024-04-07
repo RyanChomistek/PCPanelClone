@@ -19,3 +19,4 @@ MixerClient/x64/*
 *.ilk
 *.p7s
 MixerClient/packages/nlohmann.json.3.11.2/nlohmann.json.3.11.2.nupkg
+/firmware/build
