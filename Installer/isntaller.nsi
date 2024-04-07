@@ -1,3 +1,6 @@
+!include "LogicLib.nsh"
+!include "nsProcess.nsh"
+
 # name the installer
 OutFile "MixerInstaller.exe"
  
@@ -5,10 +8,22 @@ OutFile "MixerInstaller.exe"
 # by the predefined $DESKTOP variable
 InstallDir $PROGRAMFILES64\VolumeMixer\
 
+Section ""
+  StrCpy $1 "MixerClient.exe"
+
+  nsProcess::_FindProcess "$1"
+  Pop $R0
+  ${If} $R0 = 0
+    nsProcess::_KillProcess "$1"
+    Pop $R0
+
+    Sleep 500
+  ${EndIf}
+
+SectionEnd
+
 # default section
 Section
-
-; CopyFiles /SILENT "..\MixerClient\x64\Release\MixerClient.exe" "$InstDir\MixerClient.exe"
 
 # define the output path for this file
 SetOutPath $INSTDIR
