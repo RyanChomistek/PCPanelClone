@@ -24,7 +24,7 @@
 #undef max
 #undef min
 
-static bool s_fEnableLogging = true;
+static constexpr bool s_fEnableLogging = false;
 
 using namespace nlohmann::literals;
 
