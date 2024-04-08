@@ -211,6 +211,7 @@ struct AudioSessions
 	Holder<IMMDeviceEnumerator*, IUnknownReleaser<IMMDeviceEnumerator>> m_pEnumerator;
 	Holder<IAudioSessionManager2*, IUnknownReleaser<IAudioSessionManager2>> m_pSessionManager;
 	Holder<IAudioSessionEnumerator*, IUnknownReleaser<IAudioSessionEnumerator>> m_pSessionList;
+	int m_cSessions = 0;
 
 	AudioSessions()
 	{
@@ -231,6 +232,7 @@ struct AudioSessions
 			NULL, (void**)&m_pSessionManager));
 
 		IfFailThrow(m_pSessionManager->GetSessionEnumerator(&m_pSessionList));
+		IfFailThrow(m_pSessionList->GetCount(&m_cSessions));
 	}
 
 	struct AudioSessionIterator
@@ -238,24 +240,27 @@ struct AudioSessions
 		AudioSessionIterator(AudioSessions& audioSessions)
 			: m_audioSessions(audioSessions)
 		{
-			IfFailThrow(audioSessions.m_pSessionList->GetCount(&m_cSessions));
 			GetCurrentSessionInfo();
 		}
 
 		AudioSessionIterator(AudioSessions& audioSessions, int iSession)
 			: m_audioSessions(audioSessions), m_iSession(iSession)
 		{
-			IfFailThrow(audioSessions.m_pSessionList->GetCount(&m_cSessions));
 			GetCurrentSessionInfo();
 		}
 
 		void GetCurrentSessionInfo()
 		{
+			if (0 > m_iSession || m_iSession >= m_audioSessions.m_cSessions)
+			{
+				return;
+			}
+
 			clear();
 
 			while (m_hProcess == nullptr)
 			{
-				if (0 > m_iSession || m_iSession >= m_cSessions)
+				if (0 > m_iSession || m_iSession >= m_audioSessions.m_cSessions)
 				{
 					return;
 				}
@@ -280,7 +285,7 @@ struct AudioSessions
 
 			GetCurrentSessionInfo();
 
-			if (m_iSession >= m_cSessions)
+			if (m_iSession >= m_audioSessions.m_cSessions)
 			{
 				return *this;
 			}
@@ -312,8 +317,10 @@ struct AudioSessions
 				return wsImageName;
 			}
 
+			nSize = bufferSize;
 			if (!QueryFullProcessImageNameW(m_hProcess.m_p, NULL, wsImageName, &nSize))
 			{
+				DWORD error = GetLastError();
 				wsImageName[0] = '\0';
 				return wsImageName;
 			}
@@ -329,19 +336,20 @@ struct AudioSessions
 
 		AudioSessionIterator SeekToEnd()
 		{
-			return AudioSessionIterator(m_audioSessions, m_cSessions);
+			return { m_audioSessions, m_audioSessions.m_cSessions };
 		}
 
 		int m_iSession = 0;
 		AudioSessions& m_audioSessions;
-		int m_cSessions = 0;
 
 		Holder<IAudioSessionControl*, IUnknownReleaser<IAudioSessionControl>> m_pSessionControl;
 		Holder<IAudioSessionControl2*, IUnknownReleaser<IAudioSessionControl2>> m_pSessionControl2;
 		HandleHolder m_hProcess;
 
-		WCHAR wsImageName[MAX_PATH + 1];
-		DWORD nSize = MAX_PATH;
+		
+		DWORD nSize = 0;
+		static constexpr DWORD bufferSize = MAX_PATH;
+		WCHAR wsImageName[bufferSize + 1];
 
 		private:
 			void clear()
@@ -360,7 +368,7 @@ struct AudioSessions
 
 	AudioSessionIterator end()
 	{
-		return AudioSessionIterator(*this).SeekToEnd();
+		return AudioSessionIterator(*this, m_cSessions);
 	}
 };
 
