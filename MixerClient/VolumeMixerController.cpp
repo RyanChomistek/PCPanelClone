@@ -24,7 +24,7 @@
 #undef max
 #undef min
 
-static constexpr bool s_fEnableLogging = false;
+static constexpr bool s_fEnableLogging = true;
 
 using namespace nlohmann::literals;
 
@@ -495,7 +495,7 @@ float VolumeMixerController::SetFocusedVolume(float volumeDelta)
 
 bool VolumeMixerController::ToggleFocusedMute()
 {
-	float newVolume = -1;
+	bool fMute = false;
 	HWND wndFocused = GetForegroundWindow();
 
 	DWORD pid = NULL;
@@ -514,18 +514,18 @@ bool VolumeMixerController::ToggleFocusedMute()
 		if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
 		{
 			std::wstring executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\") + 1);
-			ToggleMute(executableName);
+			fMute = ToggleMute(executableName, std::nullopt);
 		}
 		CloseHandle(hProcess);
 	}
 
-	return newVolume;
+	return fMute;
 }
 
-bool VolumeMixerController::ToggleMute(const std::wstring& processName)
+bool VolumeMixerController::ToggleMute(const std::wstring& processName, std::optional<bool> optfMute)
 {
 	bool foundProcess = false;
-	BOOL selectedMuteSetting = false;
+	BOOL selectedMuteSetting = optfMute.value_or(false);
 	AudioSessions sessions;
 	auto iter = sessions.begin();
 	for (; iter != sessions.end(); ++iter)
@@ -537,19 +537,26 @@ bool VolumeMixerController::ToggleMute(const std::wstring& processName)
 
 		Holder<ISimpleAudioVolume*, IUnknownReleaser<ISimpleAudioVolume>> audioVolume = std::move(iter.GetAudioVolume());
 
-		if (!foundProcess)
+		if (!optfMute.has_value())
 		{
-			BOOL fMute = false;
-			IfFailThrow(audioVolume->GetMute(&fMute));
-			selectedMuteSetting = !fMute;
+			if (!foundProcess)
+			{
+				BOOL fMute = false;
+				IfFailThrow(audioVolume->GetMute(&fMute));
+				selectedMuteSetting = !fMute;
+			}
+
+			IfFailThrow(audioVolume->SetMute(selectedMuteSetting, nullptr));
 		}
-		
-		IfFailThrow(audioVolume->SetMute(selectedMuteSetting, nullptr));
+		else
+		{
+			IfFailThrow(audioVolume->SetMute(selectedMuteSetting, nullptr));
+		}
 
 		foundProcess = true;
 	}
 
-	return false;
+	return selectedMuteSetting;
 }
 
 bool VolumeMixerController::ToggleMasterMute()
@@ -572,7 +579,7 @@ bool VolumeMixerController::ToggleMasterMute()
 	IfFailThrow(endpointVolume->GetMute(&fMute));
 	IfFailThrow(endpointVolume->SetMute(!fMute, nullptr));
 
-	return false;
+	return !fMute;
 }
 
 VolumeMixerController::VolumeMixerController()
@@ -710,19 +717,26 @@ void VolumeMixerController::ReadInput()
 				switch (states[dialId].m_targetType)
 				{
 					case TargetType::Process:
+					{
+						std::optional<bool> optfMuteState;
 						for (std::wstring processName : states[dialId].m_vecProcessNames)
 						{
-							ToggleMute(processName);
+							optfMuteState = ToggleMute(processName, optfMuteState);
 						}
 
+						states[dialId].fMute = optfMuteState.value_or(false);
+
 						break;
+					}
 					case TargetType::All:
-						ToggleMasterMute();
+						states[dialId].fMute = ToggleMasterMute();
 						break;
 					case TargetType::Focus:
-						ToggleFocusedMute();
+						states[dialId].fMute = ToggleFocusedMute();
 						break;
 				}
+				
+				WriteColorData();
 
 				break;
 			}
@@ -783,6 +797,13 @@ void VolumeMixerController::ReadInput()
 	}
 }
 
+void ScaleColor(int& r, int& g, int& b, float scale)
+{
+	r = (int)(r * scale);
+	g = (int)(g * scale);
+	b = (int)(b * scale);
+}
+
 void VolumeMixerController::FlashEncoderVolumeToLeds(const DialState& state, float volume)
 {
 	std::stringstream ss;
@@ -822,7 +843,16 @@ void VolumeMixerController::WriteColorData()
 	for (int iState = 0; iState < numDials; iState++)
 	{
 		const DialState& state = states[iState];
-		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << "\n";
+
+		if(!state.fMute)
+			ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << "\n";
+		else
+		{
+			int r = state.r, g = state.g, b = state.b;
+			ScaleColor(r, g, b, 0);
+			ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << r << " " << g << " " << b << "\n";
+		}
+			
 	}
 
 	if (s_fEnableLogging)

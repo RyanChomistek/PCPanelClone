@@ -60,6 +60,7 @@ private:
 		std::vector<std::wstring> m_vecProcessNames;
 		TargetType m_targetType;
 		int r, g, b;
+		bool fMute = false;
 	};
 
 private:
@@ -75,7 +76,7 @@ private:
 	float SetMasterVolume(float volumeDelta);
 	float SetVolume(const std::wstring& processName, float volumeDelta);
 	float SetFocusedVolume(float volumeDelta);
-	bool ToggleMute(const std::wstring& processName);
+	bool ToggleMute(const std::wstring& processName, std::optional<bool> optfMute);
 	bool ToggleFocusedMute();
 	bool ToggleMasterMute();
 
