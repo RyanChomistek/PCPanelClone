@@ -20,12 +20,12 @@ void setup(){
   timeLastInputRecieved = millis();
 }
 
-
+int msHeartBeatCycleTime = 1000;
 
 void loop() {
   s_encoderManager.loop();
 
-  if(!s_encoderManager.fAnyEncoderChanged && millis() - timeLastHeartBeatSent > 1000)
+  if(!s_encoderManager.fAnyEncoderChanged && millis() - timeLastHeartBeatSent > msHeartBeatCycleTime)
   {
     timeLastHeartBeatSent = millis();
 
@@ -34,7 +34,7 @@ void loop() {
     Serial.write(serialBuffer);
   }
 
-  if(millis() - timeLastInputRecieved > 5000)
+  if(millis() - timeLastInputRecieved > 60000)
   {
     s_ledManager.TemporaryClearLEDs();
     timeLastInputRecieved = millis();

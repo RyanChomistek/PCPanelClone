@@ -79,11 +79,15 @@ private:
 	bool ToggleMute(const std::wstring& processName, std::optional<bool> optfMute);
 	bool ToggleFocusedMute();
 	bool ToggleMasterMute();
-
+	bool QueryAllMuteStates();
 	static constexpr int numDials = 4;
 	static constexpr float singleTickRotationAmount = .05f;
 	DialState states[numDials];
 	std::once_flag fFirstMessage;
 
 	std::optional<std::time_t> encoderFlashingStart;
+	int iVolumeChangeFlashLength = 1;
+
+	std::time_t lastMuteQuery;
+	int iMuteQueryInterval = 5;
 };

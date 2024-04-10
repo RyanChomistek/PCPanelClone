@@ -16,6 +16,7 @@
 #include <mutex>
 #include <algorithm>
 #include "scope_guard.h"
+#include "holder.h"
 
 #include "VolumeMixerController.h"
 
@@ -24,159 +25,9 @@
 #undef max
 #undef min
 
-static constexpr bool s_fEnableLogging = true;
+static constexpr bool s_fEnableLogging = false;
 
 using namespace nlohmann::literals;
-
-void PrintVolumes()
-{
-	IMMDevice* pDevice = NULL;
-	IMMDeviceEnumerator* pEnumerator = NULL;
-	IAudioSessionControl* pSessionControl = NULL;
-	IAudioSessionControl2* pSessionControl2 = NULL;
-	IAudioSessionManager2* pSessionManager = NULL;
-
-	IfFailThrow(CoInitialize(NULL));
-
-	// Create the device enumerator.
-	IfFailThrow(CoCreateInstance(
-		__uuidof(MMDeviceEnumerator),
-		NULL, CLSCTX_ALL,
-		__uuidof(IMMDeviceEnumerator),
-		(void**)&pEnumerator));
-
-	// Get the default audio device.
-	IfFailThrow(pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice));
-	IfFailThrow(pDevice->Activate(__uuidof(IAudioSessionManager2),
-		CLSCTX_ALL,
-		NULL, (void**)&pSessionManager));
-
-	IfFailThrow(pSessionManager->GetAudioSessionControl(0, FALSE, &pSessionControl));
-
-	// Get the extended session control interface pointer.
-	IfFailThrow(pSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pSessionControl2));
-
-	// Check whether this is a system sound.
-	IfFailThrow(pSessionControl2->IsSystemSoundsSession());
-
-	int cbSessionCount = 0;
-	LPWSTR pswSession = NULL;
-
-	IAudioSessionEnumerator* pSessionList = NULL;
-
-	IfFailThrow(pSessionManager->GetSessionEnumerator(&pSessionList));
-	IfFailThrow(pSessionList->GetCount(&cbSessionCount));
-	
-	if (s_fEnableLogging)
-		std::cout << cbSessionCount << std::endl;
-	
-	for (int index = 0; index < cbSessionCount; index++)
-	{
-		IfFailThrow(pSessionList->GetSession(index, &pSessionControl));
-		IfFailThrow(pSessionControl->GetDisplayName(&pswSession));
-
-		if (s_fEnableLogging)
-			std::wcout << "Session Name: " << pswSession << std::endl;
-
-		IfFailThrow(pSessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pSessionControl2));
-
-		DWORD nPID = 0;
-		IfFailThrow(pSessionControl2->GetProcessId(&nPID));
-		HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, nPID);
-		if (hProcess != NULL)
-		{
-			WCHAR wsImageName[MAX_PATH + 1];
-			DWORD nSize = MAX_PATH;
-			if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
-			{
-				if (s_fEnableLogging)
-					std::wcout << wsImageName << std::endl;
-
-				ISimpleAudioVolume* pSimpleAudioVolume;
-				IfFailThrow(pSessionControl2->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&pSimpleAudioVolume));
-
-				float volume = 0;
-				pSimpleAudioVolume->GetMasterVolume(&volume);
-				if (s_fEnableLogging)
-					std::cout << volume << std::endl;
-			}
-			CloseHandle(hProcess);
-		}
-	}
-}
-
-template <class T, class TReleaser>
-class Holder
-{
-public:
-	Holder(T p)
-		: m_p(p)
-	{}
-
-	Holder& operator= (const T& other)
-	{
-		m_p = other;
-		return *this;
-	}
-
-	Holder(std::nullptr_t)
-		: m_p(nullptr)
-	{}
-
-	Holder() = default;
-
-	Holder(Holder&& sp)
-		: m_p(sp.m_p)
-	{
-		sp.m_p = nullptr;
-	}
-
-	Holder& operator= (Holder&& other)
-	{
-		m_p = other.m_p;
-		other.m_p = nullptr;
-		return *this;
-	}
-
-	virtual ~Holder()
-	{
-		Release();
-	}
-
-	void Release()
-	{
-		TReleaser::Release(m_p);
-	}
-
-	T operator->() const
-	{
-		return m_p;
-	}
-
-	T& operator*() const
-	{
-		return *m_p;
-	}
-
-	T* operator&()
-	{
-		return &m_p;
-	}
-
-	bool operator== (Holder other)
-	{
-		return m_p == other.m_p;
-	}
-
-	bool operator!= (Holder other)
-	{
-		return m_p != other.m_p;
-	}
-
-	bool FEmpty() { return m_p == nullptr; }
-
-	T m_p = nullptr;
-};
 
 template<class T>
 struct IUnknownReleaser
@@ -372,6 +223,53 @@ struct AudioSessions
 	}
 };
 
+Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> GetMasterEndpointVolume()
+{
+	IfFailThrow(CoInitialize(NULL));
+
+	// get the device enumerator
+	Holder<IMMDeviceEnumerator*, IUnknownReleaser<IMMDeviceEnumerator>> deviceEnumerator;
+	IfFailThrow(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator));
+
+	// grab the default device
+	Holder<IMMDevice*, IUnknownReleaser<IMMDevice>> defaultDevice;
+	IfFailThrow(deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice));
+
+	// get the audio endpoint interface from the device
+	Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume;
+	IfFailThrow(defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID*)&endpointVolume));
+
+	return std::move(endpointVolume);
+}
+
+std::wstring GetFocusedProcessName()
+{
+	HWND wndFocused = GetForegroundWindow();
+
+	DWORD pid = NULL;
+	DWORD tid = GetWindowThreadProcessId(wndFocused, &pid);
+
+	if (tid == 0)
+	{
+		return L"";
+	}
+
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	std::wstring executableName;
+	if (hProcess != NULL)
+	{
+		WCHAR wsImageName[MAX_PATH + 1];
+		DWORD nSize = MAX_PATH;
+		if (QueryFullProcessImageNameW(hProcess, NULL, wsImageName, &nSize))
+		{
+			executableName = std::wstring(wsImageName).substr(std::wstring(wsImageName).find_last_of(L"\\") + 1);
+		}
+		CloseHandle(hProcess);
+	}
+
+	return executableName;
+}
+
 /// <summary>
 /// offsets the volume of a specific process by volumeDelta amount
 /// </summary>
@@ -433,19 +331,7 @@ float VolumeMixerController::SetVolume(const std::wstring& processName, float vo
 /// </summary>
 float VolumeMixerController::SetMasterVolume(float volumeDelta)
 {
-	IfFailThrow(CoInitialize(NULL));
-
-	// get the device enumerator
-	Holder<IMMDeviceEnumerator*, IUnknownReleaser<IMMDeviceEnumerator>> deviceEnumerator;
-	IfFailThrow(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator));
-	
-	// grab the default device
-	Holder<IMMDevice*, IUnknownReleaser<IMMDevice>> defaultDevice;
-	IfFailThrow(deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice));
-
-	// get the audio endpoint interface from the device
-	Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume;
-	IfFailThrow(defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID*)&endpointVolume));
+	Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume = GetMasterEndpointVolume();
 
 	// get the master volume
 	float volume = 0;
@@ -561,25 +447,75 @@ bool VolumeMixerController::ToggleMute(const std::wstring& processName, std::opt
 
 bool VolumeMixerController::ToggleMasterMute()
 {
-	IfFailThrow(CoInitialize(NULL));
-
-	// get the device enumerator
-	Holder<IMMDeviceEnumerator*, IUnknownReleaser<IMMDeviceEnumerator>> deviceEnumerator;
-	IfFailThrow(CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator));
-
-	// grab the default device
-	Holder<IMMDevice*, IUnknownReleaser<IMMDevice>> defaultDevice;
-	IfFailThrow(deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice));
-
-	// get the audio endpoint interface from the device
-	Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume;
-	IfFailThrow(defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID*)&endpointVolume));
+	Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume = GetMasterEndpointVolume();
 
 	BOOL fMute = false;
 	IfFailThrow(endpointVolume->GetMute(&fMute));
 	IfFailThrow(endpointVolume->SetMute(!fMute, nullptr));
 
 	return !fMute;
+}
+
+bool VolumeMixerController::QueryAllMuteStates()
+{
+	bool fAnyChange = false;
+	for (DialState& state : states)
+	{
+		BOOL fMute = false;
+		switch (state.m_targetType)
+		{
+		case TargetType::Process:
+		{
+			AudioSessions sessions;
+			auto iter = sessions.begin();
+			for (std::wstring processName : state.m_vecProcessNames)
+			{
+				for (; iter != sessions.end(); ++iter)
+				{
+					if (!iter.HasProcess() || wcsstr(iter.GetProcessPath(), processName.c_str()) == nullptr)
+					{
+						continue;
+					}
+
+					Holder<ISimpleAudioVolume*, IUnknownReleaser<ISimpleAudioVolume>> audioVolume = std::move(iter.GetAudioVolume());
+					IfFailThrow(audioVolume->GetMute(&fMute));
+				}
+			}
+			
+			break;
+		}
+			
+		case TargetType::All:
+		{
+			Holder<IAudioEndpointVolume*, IUnknownReleaser<IAudioEndpointVolume>> endpointVolume = GetMasterEndpointVolume();
+			IfFailThrow(endpointVolume->GetMute(&fMute));
+			break;
+		}
+		case TargetType::Focus:
+		{
+			std::wstring executableName = GetFocusedProcessName();
+			AudioSessions sessions;
+			auto iter = sessions.begin();
+			for (; iter != sessions.end(); ++iter)
+			{
+				if (!iter.HasProcess() || wcsstr(iter.GetProcessPath(), executableName.c_str()) == nullptr)
+				{
+					continue;
+				}
+
+				Holder<ISimpleAudioVolume*, IUnknownReleaser<ISimpleAudioVolume>> audioVolume = std::move(iter.GetAudioVolume());
+				IfFailThrow(audioVolume->GetMute(&fMute));
+			}
+			break;
+		}
+		}
+
+		fAnyChange |= state.fMute != fMute;
+
+		state.fMute = fMute;
+	}
+
+	return fAnyChange;
 }
 
 VolumeMixerController::VolumeMixerController()
@@ -668,6 +604,8 @@ VolumeMixerController::VolumeMixerController()
 
 		iDial++;
 	}
+
+	time(&lastMuteQuery);
 }
 
 void VolumeMixerController::ReadInput()
@@ -780,10 +718,16 @@ void VolumeMixerController::ReadInput()
 
 				time_t now;
 				time(&now);
-				if (encoderFlashingStart.has_value() && difftime(now, *encoderFlashingStart) > 1)
+				if (encoderFlashingStart.has_value() && difftime(now, *encoderFlashingStart) > iVolumeChangeFlashLength)
 				{
 					WriteColorData();
 					encoderFlashingStart = std::nullopt;
+				}
+				else if (!encoderFlashingStart.has_value() && difftime(now, lastMuteQuery) > iMuteQueryInterval)
+				{
+					time(&lastMuteQuery);
+					bool fAnyChange = QueryAllMuteStates();
+					WriteColorData();
 				}
 
 				break;

@@ -137,6 +137,7 @@
     <ClCompile Include="StandardSerialReader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Holder.h" />
     <ClInclude Include="scope_guard.h" />
     <ClInclude Include="VolumeMixerController.h" />
     <ClInclude Include="resource.h" />
