@@ -26,9 +26,9 @@ static void RotaryEncoderChanged(Direction direction, int id, int count) {
 
 static void RotaryEncoderSwitchPressed(int id)
 {
-  char serialBuffer[255];
-  sprintf(serialBuffer, "%ld %d\n", OutputEventType::Button, id);
-  Serial.write(serialBuffer);
+  // char serialBuffer[255];
+  // sprintf(serialBuffer, "%ld %d\n", OutputEventType::Button, id);
+  // Serial.write(serialBuffer);
 }
 
 void setup()

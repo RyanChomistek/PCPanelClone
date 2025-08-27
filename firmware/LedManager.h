@@ -18,6 +18,9 @@ struct Color
 
 int softwareIdToPhysicalIdMap[4] = {0, 1, 2, 3};
 
+// for the v1 board use this LED ordering
+// int softwareIdToPhysicalIdMap[4] = {0, 2, 1, 3};
+
 class LedManager
 {
 public:

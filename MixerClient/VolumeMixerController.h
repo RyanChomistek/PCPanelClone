@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <audioclient.h>
-#include "StandardSerialReader.h"
+#include "HidReader.h"
 #include <mutex>
 #include <optional>
 
@@ -44,7 +44,7 @@ enum class TargetType : int
 	Focus = 3 // targets the currently focused window
 };
 
-class VolumeMixerController : public StandardSerialReader
+class VolumeMixerController : public HidReader
 {
 public:
 	/// <summary>
@@ -69,7 +69,7 @@ private:
 	/// sends color data to the device
 	/// </summary>
 	void WriteColorData();
-	void OnConnected() final;
+	//void OnConnected() final;
 
 	void FlashEncoderVolumeToLeds(const DialState&, float volumn);
 
