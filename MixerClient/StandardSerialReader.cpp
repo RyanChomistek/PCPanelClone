@@ -181,7 +181,7 @@ HRESULT StandardSerialReader::HrReadLoop()
 					m_currentReadBuffer += szBuffer;
 
 					// Display the data
-					ReadInput();
+					// ReadInput();
 
 					// Check if EOF (CTRL+'[') has been specified
 					if (strchr(szBuffer, EOF_Char))

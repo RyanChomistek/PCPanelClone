@@ -7,17 +7,6 @@
 #include <optional>
 
 /// <summary>
-/// specifies what event is being sent from device to client
-/// </summary>
-enum class DeviceToClientEventType : int
-{
-	Button = 0, // a button is pressed
-	Dial = 1, // a dial is turned
-	HeartBeat = 2,
-	StartUp = 0xEE5F69, // the device restarted
-};
-
-/// <summary>
 /// specifies what event is being sent from client to device
 /// </summary>
 enum class ClientToDeviceEventType : int
@@ -51,7 +40,10 @@ public:
 	/// initialized the dial states by reading from a settings file
 	/// </summary>
 	VolumeMixerController();
-	void ReadInput() final;
+
+protected:
+	void ReadDial(int iDial, int64_t value) override;
+	void ReadButton(int iButton, bool value) override;
 
 private:
 	struct DialState

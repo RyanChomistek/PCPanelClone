@@ -40,8 +40,8 @@ int main()
 	//};
 
 
-	HidReader reader();
-
+	VolumeMixerController reader;
+	reader.HrReadLoop();
 
 	return NOERROR;
 }

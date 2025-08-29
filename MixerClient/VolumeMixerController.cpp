@@ -25,7 +25,7 @@
 #undef max
 #undef min
 
-static constexpr bool s_fEnableLogging = false;
+static constexpr bool s_fEnableLogging = true;
 
 using namespace nlohmann::literals;
 
@@ -608,106 +608,60 @@ VolumeMixerController::VolumeMixerController()
 	time(&lastMuteQuery);
 }
 
-void VolumeMixerController::ReadInput()
+void VolumeMixerController::ReadButton(int iButton, bool value) {
+	if (s_fEnableLogging)
+		std::cout << "btn id:" << iButton << '\n';
+
+	switch (states[iButton].m_targetType)
+	{
+		case TargetType::Process:
+		{
+			std::optional<bool> optfMuteState;
+			for (std::wstring processName : states[iButton].m_vecProcessNames)
+			{
+				optfMuteState = ToggleMute(processName, optfMuteState);
+			}
+
+			states[iButton].fMute = optfMuteState.value_or(false);
+
+			break;
+		}
+		case TargetType::All:
+			states[iButton].fMute = ToggleMasterMute();
+			break;
+		case TargetType::Focus:
+			states[iButton].fMute = ToggleFocusedMute();
+			break;
+	}
+			
+	WriteColorData();
+}
+
+void VolumeMixerController::ReadDial(int iDial, int64_t value)
 {
-	// check for a comment (delineated by "|")
-	//while (m_currentReadBuffer.find('|') != std::string::npos)
-	//{
-	//	std::string comment = m_currentReadBuffer.substr(0, m_currentReadBuffer.find('|'));
-	//	if (s_fEnableLogging)
-	//		std::cout << "<" << comment << ">" << '\n';
-	//	m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('|') + 1, m_currentReadBuffer.length());
-	//}
+	if (s_fEnableLogging)
+		std::cout << "dial id:" << iDial << " val:" << value << '\n';
 
-	//// check for a command (delineated by "\n")
-	//while (m_currentReadBuffer.find('\n') != std::string::npos)
-	//{
-	//	std::string token = m_currentReadBuffer.substr(0, m_currentReadBuffer.find('\n'));
-	//	std::stringstream ss(token);
+	float newVolume = -1;
+	switch (states[iDial].m_targetType)
+	{
+		case TargetType::Process:
+			for (std::wstring processName : states[iDial].m_vecProcessNames)
+			{
+				newVolume = std::max(newVolume, SetVolume(processName, value * singleTickRotationAmount));
+			}
+						
+			break;
+		case TargetType::All:
+			newVolume = SetMasterVolume(value * singleTickRotationAmount);
+			break;
+		case TargetType::Focus:
+			newVolume = SetFocusedVolume(value * singleTickRotationAmount);
+	}
 
-	//	int iType;
-	//	ss >> iType;
-
-	//	DeviceToClientEventType type = static_cast<DeviceToClientEventType>(iType);
-	//	switch (type)
-	//	{
-	//		case DeviceToClientEventType::StartUp:
-	//			if (s_fEnableLogging)
-	//				std::cout << "Start up" << '\n';
-	//			WriteColorData();
-	//			break;
-	//		case DeviceToClientEventType::Button:
-	//		{
-	//			int dialId;
-	//			ss >> dialId;
-
-	//			if (s_fEnableLogging)
-	//				std::cout << "btn id:" << dialId << '\n';
-
-	//			switch (states[dialId].m_targetType)
-	//			{
-	//				case TargetType::Process:
-	//				{
-	//					std::optional<bool> optfMuteState;
-	//					for (std::wstring processName : states[dialId].m_vecProcessNames)
-	//					{
-	//						optfMuteState = ToggleMute(processName, optfMuteState);
-	//					}
-
-	//					states[dialId].fMute = optfMuteState.value_or(false);
-
-	//					break;
-	//				}
-	//				case TargetType::All:
-	//					states[dialId].fMute = ToggleMasterMute();
-	//					break;
-	//				case TargetType::Focus:
-	//					states[dialId].fMute = ToggleFocusedMute();
-	//					break;
-	//			}
-	//			
-	//			WriteColorData();
-
-	//			break;
-	//		}
-	//		case DeviceToClientEventType::Dial:
-	//		{
-	//			int dialId, dir, cnt;
-	//			ss >> dialId >> dir >> cnt;
-
-	//			if (s_fEnableLogging)
-	//				std::cout << "dial id:" << dialId << " dir:" << dir << " cnt:" << cnt << '\n';
-
-	//			int deltaCnt = cnt - states[dialId].m_Counter;
-	//			float newVolume = -1;
-	//			switch (states[dialId].m_targetType)
-	//			{
-	//				case TargetType::Process:
-	//					for (std::wstring processName : states[dialId].m_vecProcessNames)
-	//					{
-	//						newVolume = std::max(newVolume, SetVolume(processName, deltaCnt * singleTickRotationAmount));
-	//					}
-	//						
-	//					break;
-	//				case TargetType::All:
-	//					newVolume = SetMasterVolume(deltaCnt * singleTickRotationAmount);
-	//					break;
-	//				case TargetType::Focus:
-	//					newVolume = SetFocusedVolume(deltaCnt * singleTickRotationAmount);
-	//			}
-
-	//			states[dialId].m_Counter = cnt;
-	//			if(newVolume >= 0)
-	//				FlashEncoderVolumeToLeds(states[dialId], newVolume);
-	//			break;
-	//		}
-	//	}
-
-	//	m_currentReadBuffer = m_currentReadBuffer.substr(m_currentReadBuffer.find('\n') + 1, m_currentReadBuffer.length());
-
-	//	if (s_fEnableLogging)
-	//		std::cout << token << '\n';
-	//}
+	states[iDial].m_Counter += value;
+	if(newVolume >= 0)
+		FlashEncoderVolumeToLeds(states[iDial], newVolume);
 }
 
 void ScaleColor(int& r, int& g, int& b, float scale)
@@ -749,29 +703,29 @@ void VolumeMixerController::FlashEncoderVolumeToLeds(const DialState& state, flo
 	encoderFlashingStart = time(&now);
 }
 
-//void VolumeMixerController::WriteColorData()
-//{
-//	std::stringstream ss;
-//
-//	for (int iState = 0; iState < numDials; iState++)
-//	{
-//		const DialState& state = states[iState];
-//
-//		if(!state.fMute)
-//			ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << "\n";
-//		else
-//		{
-//			int r = state.r, g = state.g, b = state.b;
-//			ScaleColor(r, g, b, 0);
-//			ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << r << " " << g << " " << b << "\n";
-//		}
-//			
-//	}
-//
-//	if (s_fEnableLogging)
-//		std::cout << ss.str() << "\n";
-//	m_serial.Write(ss.str().c_str(), ss.str().size());
-//}
+void VolumeMixerController::WriteColorData()
+{
+	//std::stringstream ss;
+
+	//for (int iState = 0; iState < numDials; iState++)
+	//{
+	//	const DialState& state = states[iState];
+
+	//	if(!state.fMute)
+	//		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << state.r << " " << state.g << " " << state.b << "\n";
+	//	else
+	//	{
+	//		int r = state.r, g = state.g, b = state.b;
+	//		ScaleColor(r, g, b, 0);
+	//		ss << (int)ClientToDeviceEventType::Color << " " << iState << " " << r << " " << g << " " << b << "\n";
+	//	}
+	//		
+	//}
+
+	//if (s_fEnableLogging)
+	//	std::cout << ss.str() << "\n";
+	//m_serial.Write(ss.str().c_str(), ss.str().size());
+}
 //
 //void VolumeMixerController::OnConnected()
 //{

@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <unordered_map>
+#include <algorithm>
 
 #include "hidsdi.h"
 #include "setupapi.h"
@@ -12,30 +13,73 @@
 
 #include "HidReader.h"
 
-static void BuildInputValueIndex(
-	PHIDP_PREPARSED_DATA ppd,
-	std::unordered_map<USHORT, HIDP_VALUE_CAPS>& mapOut)
+void HidReader::BuildInputValueIndex(
+	PHIDP_PREPARSED_DATA ppd)
 {
+	hidValues.clear();
+
 	// Query how many value caps first
 	USHORT valueCapsCount = 0;
 	HidP_GetValueCaps(HidP_Input, NULL, &valueCapsCount, ppd);
 	if (valueCapsCount == 0) return;
 
-	std::vector<HIDP_VALUE_CAPS> caps(valueCapsCount);
-	if (HidP_GetValueCaps(HidP_Input, caps.data(), &valueCapsCount, ppd) != HIDP_STATUS_SUCCESS) return;
+	std::vector<HIDP_VALUE_CAPS> valueCaps(valueCapsCount);
+	if (HidP_GetValueCaps(HidP_Input, valueCaps.data(), &valueCapsCount, ppd) != HIDP_STATUS_SUCCESS) return;
 
+	std::vector<int> dialIndexes;
 	for (USHORT i = 0; i < valueCapsCount; ++i) {
-		const auto& c = caps[i];
+		const auto& c = valueCaps[i];
 		if (!c.IsRange) {
-			mapOut[c.NotRange.DataIndex] = c;
+			hidValues[c.NotRange.DataIndex] = { .caps = c};
+			dialIndexes.push_back(c.NotRange.DataIndex);
 		}
 		else {
-			// For ranged items, the DataIndex field is the first index in the range.
-			// DataIndexMax is available on KM side; in UM you typically rely on HidP_GetData
-			// returning DataIndex for each control instance. We’ll stash the base and check ranges on the fly.
-			mapOut[c.Range.DataIndexMin] = c;
+			for (int dataIndex = c.Range.DataIndexMin; dataIndex <= c.Range.DataIndexMax; dataIndex++) {
+				hidValues[dataIndex] = { .caps = c };
+				dialIndexes.push_back(dataIndex);
+			}
 		}
 	}
+	
+	std::vector<int> buttonIndexes;
+	USHORT buttonCapsCount = 0;
+	HidP_GetButtonCaps(HidP_Input, NULL, &buttonCapsCount, ppd);
+	if (buttonCapsCount == 0) return;
+	std::vector<HIDP_BUTTON_CAPS> buttonCaps(buttonCapsCount);
+	if (HidP_GetButtonCaps(HidP_Input, buttonCaps.data(), &buttonCapsCount, ppd) != HIDP_STATUS_SUCCESS) return;
+	for (USHORT i = 0; i < buttonCapsCount; ++i) {
+		const auto& c = buttonCaps[i];
+
+		if (!c.IsRange) {
+			hidButtons[c.NotRange.DataIndex] = { .caps = c };
+			buttonIndexes.push_back(c.NotRange.DataIndex);
+		}
+		else {
+			for (int dataIndex = c.Range.DataIndexMin; dataIndex <= c.Range.DataIndexMax; dataIndex++) {
+				hidButtons[dataIndex] = { .caps = c };
+				buttonIndexes.push_back(dataIndex);
+			}
+		}
+	}
+
+	std::ranges::sort(dialIndexes);
+	std::ranges::sort(buttonIndexes);
+
+	std::cout << "\n dials: ";
+
+	for (int iDial = 0; iDial < dialIndexes.size(); iDial++) {
+		hidValues[dialIndexes[iDial]].typeIndex = iDial;
+		std::cout << "[" << iDial << ", " << dialIndexes[iDial] << "] ";
+	}
+
+	std::cout << "buttons: ";
+	for (int iButton = 0; iButton < buttonIndexes.size(); iButton++) {
+		hidButtons[buttonIndexes[iButton]].typeIndex = iButton;
+		std::cout << "[" << iButton << ", " << buttonIndexes[iButton] << "] ";
+	}
+
+	std::cout << "\n";
+
 }
 
 LONG NormalizeHidValue(ULONG rawValue, HIDP_VALUE_CAPS* caps)
@@ -64,8 +108,8 @@ LONG NormalizeHidValue(ULONG rawValue, HIDP_VALUE_CAPS* caps)
 		normalized = (signedValue - caps->LogicalMin) / range;
 	}
 
-	printf("Raw=%ld Signed=%ld Normalized=%.3f\n",
-		rawValue, signedValue, normalized);
+	//printf("Raw=%ld Signed=%ld Normalized=%.3f\n",
+	//	rawValue, signedValue, normalized);
 
 	return signedValue; // or return normalized as double if you prefer
 }
@@ -73,76 +117,6 @@ LONG NormalizeHidValue(ULONG rawValue, HIDP_VALUE_CAPS* caps)
 static bool IsDial(USAGE page, USAGE usage)
 {
 	return (page == 0x01 && usage == 0x37); // Generic Desktop / Dial
-}
-
-// Optional: map DataIndex to concrete Usage for ranged entries.
-// For ranged ValueCaps, HidP_GetData will return distinct DataIndex values
-// (base + controlInstance). We try to resolve them to a specific Usage.
-static bool ResolveUsageForDataIndex(
-	USHORT dataIndex,
-	const std::unordered_map<USHORT, HIDP_VALUE_CAPS>& idxMap,
-	USAGE& outPage,
-	USAGE& outUsage,
-	HIDP_VALUE_CAPS& caps)
-{
-	// Exact hit?
-	auto it = idxMap.find(dataIndex);
-	if (it != idxMap.end()) {
-		const auto& info = it->second;
-		outPage = info.UsagePage;
-		if (!info.IsRange) {
-			outUsage = info.NotRange.Usage;
-			return true;
-		}
-		// Ranged: DataIndex for instance k might be (base + k).
-		// Walk backwards to find the nearest base we stored.
-		// (In practice this is usually contiguous; we search up to 32 back for safety.)
-		for (int back = 0; back < 32; ++back) {
-			USHORT candidate = (USHORT)(dataIndex - back);
-			auto jt = idxMap.find(candidate);
-			if (jt == idxMap.end()) break;
-
-			caps = jt->second;
-			if (jt->second.UsagePage == info.UsagePage && jt->second.IsRange) {
-				USHORT offset = dataIndex - candidate;
-				USHORT usage = jt->second.Range.UsageMin + offset;
-				if (usage <= jt->second.Range.UsageMax) {
-					outUsage = usage;
-					return true;
-				}
-			}
-		}
-		// Fallback: we at least know the page
-		outUsage = 0;
-		return true;
-	}
-
-	// Not found
-	return false;
-}
-
-static bool GetLogicalRangeForDataIndex(
-	USHORT dataIndex,
-	const std::unordered_map<USHORT, HIDP_VALUE_CAPS>& idxMap,
-	LONG& outMin,
-	LONG& outMax)
-{
-	// Exact or nearest ranged base (same trick as above)
-	auto it = idxMap.find(dataIndex);
-	if (it != idxMap.end()) {
-		outMin = it->second.LogicalMin;
-		outMax = it->second.LogicalMax;
-		return true;
-	}
-	for (int back = 0; back < 32; ++back) {
-		USHORT candidate = (USHORT)(dataIndex - back);
-		auto jt = idxMap.find(candidate);
-		if (jt == idxMap.end()) break;
-		outMin = jt->second.LogicalMin;
-		outMax = jt->second.LogicalMax;
-		return true;
-	}
-	return false;
 }
 
 void HidReader::ReadLoopDecodeDial(HANDLE hDevice, PHIDP_PREPARSED_DATA ppd, ULONG inputLen)
@@ -155,8 +129,7 @@ void HidReader::ReadLoopDecodeDial(HANDLE hDevice, PHIDP_PREPARSED_DATA ppd, ULO
 	}
 
 	// Build DataIndex → meta map once
-	std::unordered_map<USHORT, HIDP_VALUE_CAPS> idxMap;
-	BuildInputValueIndex(ppd, idxMap);
+	BuildInputValueIndex(ppd);
 
 	std::vector<BYTE> report(inputLen);
 
@@ -212,97 +185,28 @@ void HidReader::ReadLoopDecodeDial(HANDLE hDevice, PHIDP_PREPARSED_DATA ppd, ULO
 		// Iterate controls reported in this packet
 		for (ULONG i = 0; i < dataCount; ++i) {
 			const HIDP_DATA& d = dataList[i];
+			bool isDial = hidValues.find(d.DataIndex) != hidValues.end();
+			bool isButton = hidButtons.find(d.DataIndex) != hidButtons.end();
 
-			// Buttons yield .On, Values yield .RawValue. We want numeric (value) controls.
-			// Heuristic: if Logical range exists for DataIndex, treat as value.
-			LONG lmin = 0, lmax = 0;
-			bool hasRange = GetLogicalRangeForDataIndex(d.DataIndex, idxMap, lmin, lmax);
-
-			if (hasRange) {
-				USAGE page = 0, usage = 0;
-				HIDP_VALUE_CAPS caps;
-				if (!ResolveUsageForDataIndex(d.DataIndex, idxMap, page, usage, caps)) {
-					//// Unknown value control — still print for debugging
-					//LONG val = NormalizeHidValue((LONG)d.RawValue, &caps);
-					//printf("Value DI=%u UP=0x%X U=0x%X Raw=%ld\n",
-					//	d.DataIndex, page, usage, val);
-					continue;
-				}
-
-				LONG val = NormalizeHidValue((LONG)d.RawValue, &caps);
-
-				if (IsDial(page, usage)) {
-					// Many dial devices report delta per packet (e.g., -1, +1).
-					// Others report an absolute position with wrap; you can infer delta between packets if needed.
-					printf("DIAL: %ld delta=%ld (logical [%ld..%ld])\n", d.RawValue, val, lmin, lmax);
-				}
-				else {
-					// Other numeric control (wheel, slider, etc.)
-					printf("VALUE: UP=0x%X U=0x%X Raw=%ld\n", page, usage, val);
-				}
+			if (isDial) {
+				HidValue& hidValue = hidValues.at(d.DataIndex);
+				LONG val = NormalizeHidValue((LONG)d.RawValue, &hidValue.caps);
+				hidValue.value = static_cast<uint64_t>(val);
+				printf("DIAL: %ld delta= %ld | %ld\n", d.DataIndex, d.RawValue, val);
+				ReadDial(hidValue.typeIndex, val);
 			}
-			else {
-				// Likely a button
+			else if (isButton) {
+				hidButtons[d.DataIndex].value = d.On ? true : false;
 				printf("BUTTON DI=%u On=%d\n", d.DataIndex, d.On ? 1 : 0);
+				ReadButton(hidButtons[d.DataIndex].typeIndex, d.On ? true : false);
 			}
 		}
+
+		std::cout << '\n';
+
+		
 	}
 
-	CloseHandle(ol.hEvent);
-}
-
-void HidReader::ReadHidLoop(HANDLE hDevice, ULONG reportLength) {
-	OVERLAPPED ol = { 0 };
-	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	if (!ol.hEvent) {
-		printf("Failed to create event: %lu\n", GetLastError());
-		return;
-	}
-
-	BYTE* report = (BYTE*)malloc(reportLength);
-	if (!report) return;
-
-	while (1) {
-		DWORD bytesRead = 0;
-		ResetEvent(ol.hEvent);
-
-		// Post an async read
-		BOOL ok = ReadFile(hDevice, report, reportLength, &bytesRead, &ol);
-		if (!ok) {
-			DWORD err = GetLastError();
-			if (err != ERROR_IO_PENDING) {
-				printf("ReadFile failed: %lu\n", err);
-				break;
-			}
-		}
-
-		// Wait for the read to complete (or timeout)
-		DWORD wait = WaitForSingleObject(ol.hEvent, INFINITE); // block until report
-		if (wait == WAIT_OBJECT_0) {
-			if (GetOverlappedResult(hDevice, &ol, &bytesRead, FALSE)) {
-				// ✅ Got a HID report
-				printf("Report (%lu bytes): ", bytesRead);
-				for (DWORD i = 0; i < bytesRead; i++) {
-					printf("%02X ", report[i]);
-				}
-				printf("\n");
-
-				// TODO: parse HID report here (HidP_GetData, etc.)
-			}
-			else {
-				printf("GetOverlappedResult failed: %lu\n", GetLastError());
-				break;
-			}
-		}
-		else {
-			printf("Wait failed or timeout\n");
-			CancelIo(hDevice);
-			break;
-		}
-	}
-
-	free(report);
 	CloseHandle(ol.hEvent);
 }
 
@@ -376,7 +280,7 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 		sid = buf;
 
 	}
-
+	std::wcout << pid << " | " << vid << " | " << sid << "\n";
 	if (caps.Usage != 0x37 || caps.UsagePage != 1) {
 		return true;
 	}

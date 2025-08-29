@@ -24,7 +24,8 @@ protected:
 	/// <summary>
 	/// called every time the client has read new data from the device
 	/// </summary>
-	virtual void ReadInput() = 0;
+	virtual void ReadDial(int iDial) = 0;
+	virtual void ReadButton(int iButton) = 0;
 
 	/// <summary>
 	/// called once the device is connected to the serial stream
