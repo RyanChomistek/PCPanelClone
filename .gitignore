@@ -20,3 +20,12 @@ MixerClient/x64/*
 *.p7s
 MixerClient/packages/nlohmann.json.3.11.2/nlohmann.json.3.11.2.nupkg
 /firmware/build
+/MixerPcbV2/gerber
+*.gbr
+*.zip
+/MixerPcbV2/PEC11R_4215F_S0024
+/MixerPcbV2/PEC12R_4225F_S0024
+MixerPcbV2/~_autosave-MixerPcbV2.kicad_pcb.lck
+MixerPcbV2/~MixerPcbV2.kicad_sch.lck
+MixerPcbV2/fp-info-cache
+MixerPcbV2/\#auto_saved_files\#

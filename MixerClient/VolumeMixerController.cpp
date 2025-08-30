@@ -673,32 +673,46 @@ void ScaleColor(int& r, int& g, int& b, float scale)
 
 void VolumeMixerController::FlashEncoderVolumeToLeds(const DialState& state, float volume)
 {
-	std::stringstream ss;
+	std::vector<UCHAR> outReport;
+	outReport.push_back(1);// Report ID
+
 	volume *= numDials;
 	for (int iLed = 0; iLed < numDials; iLed++)
 	{
 		if (volume >= 1)
 		{
-			ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << state.r << " " << state.g << " " << state.b << "\n";
+			outReport.push_back(state.r);
+			outReport.push_back(state.g);
+			outReport.push_back(state.b);
+			//ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << state.r << " " << state.g << " " << state.b << "\n";
 		}
 		else if (volume < 0)
 		{
-			ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << 0 << " " << 0 << " " << 0 << "\n";
+			outReport.push_back(0);
+			outReport.push_back(0);
+			outReport.push_back(0);
+			//ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << 0 << " " << 0 << " " << 0 << "\n";
 		}
 		else
 		{
 			int r = (int)(state.r * volume);
 			int g = (int)(state.g * volume);
 			int b = (int)(state.b * volume);
-			ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << r << " " << g << " " << b << "\n";
+			outReport.push_back(r);
+			outReport.push_back(g);
+			outReport.push_back(b);
+			//ss << (int)ClientToDeviceEventType::Color << " " << iLed << " " << r << " " << g << " " << b << "\n";
 		}
 
 		volume -= 1;
 	}
 
-	if (s_fEnableLogging)
-		std::cout << ss.str() << "\n";
+	//if (s_fEnableLogging)
+	//	std::cout << ss.str() << "\n";
 	//m_serial.Write(ss.str().c_str(), ss.str().size());
+
+	WriteHidOut(outReport);
+
 	std::time_t now;
 	encoderFlashingStart = time(&now);
 }

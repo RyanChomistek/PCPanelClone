@@ -119,7 +119,7 @@ static bool IsDial(USAGE page, USAGE usage)
 	return (page == 0x01 && usage == 0x37); // Generic Desktop / Dial
 }
 
-void HidReader::ReadLoopDecodeDial(HANDLE hDevice, PHIDP_PREPARSED_DATA ppd, ULONG inputLen)
+void HidReader::ReadLoopDecodeDial(PHIDP_PREPARSED_DATA ppd, ULONG inputLen)
 {
 	OVERLAPPED ol{};
 	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -242,7 +242,7 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 
 
 
-	HANDLE hDevice = CreateFile(pDetailData->DevicePath, GENERIC_READ | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+	hDevice = CreateFile(pDetailData->DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
 		NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 
 	if (hDevice == INVALID_HANDLE_VALUE) {
@@ -253,8 +253,8 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 
 	PHIDP_PREPARSED_DATA ppd;
 	HidD_GetPreparsedData(hDevice, &ppd);
-	HIDP_CAPS caps;
-	HidP_GetCaps(ppd, &caps);
+
+	HidP_GetCaps(ppd, &deviceCaps);
 	//HidD_FreePreparsedData(ppd);
 
 	// vid_0424&pid_274
@@ -281,7 +281,7 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 
 	}
 	std::wcout << pid << " | " << vid << " | " << sid << "\n";
-	if (caps.Usage != 0x37 || caps.UsagePage != 1) {
+	if (deviceCaps.Usage != 0x37 || deviceCaps.UsagePage != 1) {
 		return true;
 	}
 
@@ -290,18 +290,19 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 	std::wcout << pid << " | " << vid << " | " << sid << "\n";
 
 	std::wcout
-		<< "usage " << std::hex << caps.Usage << " "
-		<< "UsagePage " << caps.UsagePage << " "
-		<< "NumberInputButtonCaps " << caps.NumberInputButtonCaps << " "
-		<< "NumberInputValueCaps " << caps.NumberInputValueCaps << " "
-		<< "NumberInputDataIndices " << caps.NumberInputDataIndices << " "
+		<< "usage " << std::hex << deviceCaps.Usage << " "
+		<< "UsagePage " << deviceCaps.UsagePage << " "
+		<< "NumberInputButtonCaps " << deviceCaps.NumberInputButtonCaps << " "
+		<< "NumberInputValueCaps " << deviceCaps.NumberInputValueCaps << " "
+		<< "NumberInputDataIndices " << deviceCaps.NumberInputDataIndices << " "
+		<< "OutputReportByteLength " << deviceCaps.OutputReportByteLength << " "
 		<< "\n\n"
 		;
 
-	printf("Input report length: %d\n", caps.InputReportByteLength);
+	printf("Input report length: %d\n", deviceCaps.InputReportByteLength);
 
 
-	ReadLoopDecodeDial(hDevice, ppd, caps.InputReportByteLength * 10);
+	ReadLoopDecodeDial(ppd, deviceCaps.InputReportByteLength * 10);
 
 	free(pDetailData);
 	return true;
@@ -322,5 +323,50 @@ HRESULT HidReader::HrReadLoop() {
 }
 
 HidReader::HidReader() {
+
+}
+
+void HidReader::WriteHidOut(std::vector<UCHAR>& outReport) {
+	outReport.resize(deviceCaps.OutputReportByteLength);
+	outReport[0] = 1;      // Report ID
+
+	//BOOL success = HidD_SetOutputReport(hDevice, outReport.data(), outReport.size());
+	//if (!success) {
+	//	printf("HidD_SetOutputReport failed: %d\n", GetLastError());
+	//}
+
+	OVERLAPPED ol{};
+	ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!ol.hEvent) {
+		printf("CreateEvent failed: %lu\n", GetLastError());
+		return;
+	}
+
+	ResetEvent(ol.hEvent);
+
+	DWORD bytesWritten;
+	BOOL result = WriteFile(
+		hDevice,
+		outReport.data(),
+		outReport.size(),
+		&bytesWritten,
+		&ol);
+
+	if (!result) {
+		if (GetLastError() == ERROR_IO_PENDING) {
+			// Asynchronous write in progress
+			DWORD wait = WaitForSingleObject(ol.hEvent, 5000); // 5s timeout
+			if (wait == WAIT_OBJECT_0) {
+				GetOverlappedResult(hDevice, &ol, &bytesWritten, FALSE);
+				printf("Wrote %lu bytes\n", bytesWritten);
+			}
+			else {
+				printf("Wait failed: %lu\n", GetLastError());
+			}
+		}
+		else {
+			printf("WriteFile failed: %lu\n", GetLastError());
+		}
+	}
 
 }
