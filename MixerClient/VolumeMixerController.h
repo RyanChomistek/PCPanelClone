@@ -44,6 +44,7 @@ public:
 protected:
 	void ReadDial(int iDial, int64_t value) override;
 	void ReadButton(int iButton, bool value) override;
+	void OnSync() override;
 
 private:
 	struct DialState

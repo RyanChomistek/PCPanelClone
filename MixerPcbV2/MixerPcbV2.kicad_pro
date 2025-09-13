@@ -54,22 +54,6 @@
       "diff_pair_dimensions": [],
       "drc_exclusions": [
         [
-          "silk_edge_clearance|190400000|80970000|d6e477de-98c0-40bd-a324-d73a2217c4c3|33c882c7-bef9-4b54-8ae1-8bc87c6ebacc",
-          ""
-        ],
-        [
-          "silk_edge_clearance|190400000|80970000|d6e477de-98c0-40bd-a324-d73a2217c4c3|fb811ace-d700-4f46-872f-d052c5335979",
-          ""
-        ],
-        [
-          "silk_edge_clearance|190400000|88590000|d6e477de-98c0-40bd-a324-d73a2217c4c3|7021165b-a071-4a62-bba5-6b97195b646b",
-          ""
-        ],
-        [
-          "silk_edge_clearance|190400000|88590000|d6e477de-98c0-40bd-a324-d73a2217c4c3|92eac365-c565-45a9-8b3d-f742869be98f",
-          ""
-        ],
-        [
           "silk_over_copper|161366148|76420897|9709dd53-8b1b-40c1-9277-3fb320c66b25|00000000-0000-0000-0000-000000000000",
           ""
         ],
@@ -599,10 +583,10 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "gerber/",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "gerber/MixerPcbV2.step",
       "svg": "",
       "vrml": ""
     },
@@ -672,12 +656,48 @@
           "label": "Datasheet",
           "name": "Datasheet",
           "show": true
+        },
+        {
+          "group_by": false,
+          "label": "MAXIMUM_PACKAGE_HEIGHT",
+          "name": "MAXIMUM_PACKAGE_HEIGHT",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "PARTREV",
+          "name": "PARTREV",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "STANDARD",
+          "name": "STANDARD",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "MANUFACTURER",
+          "name": "MANUFACTURER",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Description",
+          "name": "Description",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "#",
+          "name": "${ITEM_NUMBER}",
+          "show": false
         }
       ],
       "filter_string": "",
       "group_symbols": true,
       "include_excluded_from_bom": true,
-      "name": "Default Editing",
+      "name": "",
       "sort_asc": true,
       "sort_field": "Reference"
     },

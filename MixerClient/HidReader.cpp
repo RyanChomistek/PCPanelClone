@@ -134,6 +134,9 @@ void HidReader::ReadLoopDecodeDial(PHIDP_PREPARSED_DATA ppd, ULONG inputLen)
 	std::vector<BYTE> report(inputLen);
 
 	printf("Listening for HID input reports...\n");
+
+	OnSync();
+
 	while (true) {
 		ResetEvent(ol.hEvent);
 		DWORD bytesRead = 0;
@@ -147,7 +150,14 @@ void HidReader::ReadLoopDecodeDial(PHIDP_PREPARSED_DATA ppd, ULONG inputLen)
 			}
 		}
 
-		DWORD w = WaitForSingleObject(ol.hEvent, INFINITE);
+		DWORD w = WaitForSingleObject(ol.hEvent, 1000);
+
+		if (w == WAIT_TIMEOUT) {
+			// refresh leds
+			OnSync();
+			continue;
+		}
+
 		if (w != WAIT_OBJECT_0) {
 			printf("Wait failed: %lu\n", GetLastError());
 			CancelIo(hDevice);
@@ -193,7 +203,8 @@ void HidReader::ReadLoopDecodeDial(PHIDP_PREPARSED_DATA ppd, ULONG inputLen)
 				LONG val = NormalizeHidValue((LONG)d.RawValue, &hidValue.caps);
 				hidValue.value = static_cast<uint64_t>(val);
 				printf("DIAL: %ld delta= %ld | %ld\n", d.DataIndex, d.RawValue, val);
-				ReadDial(hidValue.typeIndex, val);
+				if (val != 0)
+					ReadDial(hidValue.typeIndex, val);
 			}
 			else if (isButton) {
 				hidButtons[d.DataIndex].value = d.On ? true : false;
@@ -358,7 +369,7 @@ void HidReader::WriteHidOut(std::vector<UCHAR>& outReport) {
 			DWORD wait = WaitForSingleObject(ol.hEvent, 5000); // 5s timeout
 			if (wait == WAIT_OBJECT_0) {
 				GetOverlappedResult(hDevice, &ol, &bytesWritten, FALSE);
-				printf("Wrote %lu bytes\n", bytesWritten);
+				//printf("Wrote %lu bytes\n", bytesWritten);
 			}
 			else {
 				printf("Wait failed: %lu\n", GetLastError());

@@ -32,7 +32,7 @@ public:
 	virtual void ReadButton(int iButton, bool value) = 0;
 
 	void WriteHidOut(std::vector<UCHAR>& outReport);
-
+	virtual void OnSync() = 0;
 private:
 	void ReadLoopDecodeDial(PHIDP_PREPARSED_DATA ppd, ULONG inputLen);
 	void BuildInputValueIndex(
