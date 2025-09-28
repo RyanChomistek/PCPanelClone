@@ -15,7 +15,7 @@ int main()
 	VolumeMixerController reader;
 	while (true) {
 		reader.HrReadLoop();
-		// Sleep(1000);
+		Sleep(1000);
 	}
 
 	return NOERROR;

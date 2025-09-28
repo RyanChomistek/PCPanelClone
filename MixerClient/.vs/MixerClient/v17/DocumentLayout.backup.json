@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\MixerClient.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|solutionrelative:MixerClient.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\HidReader.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|solutionrelative:HidReader.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
@@ -28,10 +32,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\VolumeMixerController.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|solutionrelative:VolumeMixerController.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\MixerClient.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{31488D4E-2608-426D-8946-7BAA95FA9AF5}|MixerClient.vcxproj|solutionrelative:MixerClient.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
   ],
   "DocumentGroupContainers": [
@@ -59,13 +59,13 @@
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "HidReader.cpp",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\HidReader.cpp",
               "RelativeDocumentMoniker": "HidReader.cpp",
               "ToolTip": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\HidReader.cpp",
               "RelativeToolTip": "HidReader.cpp",
-              "ViewState": "AgIAAMkAAAAAAAAAAAAowPAAAABlAAAAAAAAAA==",
+              "ViewState": "AgIAAD4BAAAAAAAAAAAAAFsBAAA8AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-08-30T04:04:32.293Z",
               "EditorCaption": ""
@@ -74,11 +74,11 @@
         },
         {
           "DockedWidth": 312,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 2,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "scope_guard.h",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\scope_guard.h",
               "RelativeDocumentMoniker": "scope_guard.h",
@@ -91,7 +91,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "Util.h",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\Util.h",
               "RelativeDocumentMoniker": "Util.h",
@@ -104,19 +104,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 0,
               "Title": "MixerClient.cpp",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\MixerClient.cpp",
               "RelativeDocumentMoniker": "MixerClient.cpp",
               "ToolTip": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\MixerClient.cpp",
               "RelativeToolTip": "MixerClient.cpp",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-09-13T05:04:28.746Z"
+              "WhenOpened": "2025-09-13T05:04:28.746Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "VolumeMixerController.cpp",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\VolumeMixerController.cpp",
               "RelativeDocumentMoniker": "VolumeMixerController.cpp",
@@ -129,7 +130,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "HidReader.h",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\HidReader.h",
               "RelativeDocumentMoniker": "HidReader.h",
@@ -142,7 +143,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "fileapi.h",
               "DocumentMoniker": "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.26100.0\\um\\fileapi.h",
               "RelativeDocumentMoniker": "..\\..\\..\\..\\..\\..\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.26100.0\\um\\fileapi.h",
@@ -155,7 +156,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "VolumeMixerController.h",
               "DocumentMoniker": "C:\\Users\\ryanc\\Documents\\GitHub\\PCPanelClone\\MixerClient\\VolumeMixerController.h",
               "RelativeDocumentMoniker": "VolumeMixerController.h",

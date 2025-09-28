@@ -265,9 +265,8 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 
 	PHIDP_PREPARSED_DATA ppd;
 	HidD_GetPreparsedData(hDevice, &ppd);
-
 	HidP_GetCaps(ppd, &deviceCaps);
-	//HidD_FreePreparsedData(ppd);
+	
 
 	// vid_0424&pid_274
 	// usage 1 UsagePage ff00
@@ -296,6 +295,7 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 	if (deviceCaps.Usage != 0x37 || deviceCaps.UsagePage != 1) {
 		free(pDetailData);
 		CloseHandle(hDevice);
+		HidD_FreePreparsedData(ppd);
 		return true;
 	}
 
@@ -318,8 +318,8 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 
 	ReadLoopDecodeDial(ppd, deviceCaps.InputReportByteLength * 10);
 
+	HidD_FreePreparsedData(ppd);
 	free(pDetailData);
-
 	if (!CloseHandle(hDevice)) {
 		printf("CloseHandle failed: %lu\n", GetLastError());
 	}
