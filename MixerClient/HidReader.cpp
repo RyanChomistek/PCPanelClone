@@ -258,6 +258,7 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 
 	if (hDevice == INVALID_HANDLE_VALUE) {
 		HRESULT hr = GetLastError();
+		free(pDetailData);
 		//std::cout << "failed to make file\n";
 		return true;
 	}
@@ -293,6 +294,8 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 	}
 	std::wcout << pid << " | " << vid << " | " << sid << "\n";
 	if (deviceCaps.Usage != 0x37 || deviceCaps.UsagePage != 1) {
+		free(pDetailData);
+		CloseHandle(hDevice);
 		return true;
 	}
 
@@ -316,6 +319,11 @@ bool HidReader::loadHidDevice(int index, GUID& hidGuid, HDEVINFO& deviceInfoSet)
 	ReadLoopDecodeDial(ppd, deviceCaps.InputReportByteLength * 10);
 
 	free(pDetailData);
+
+	if (!CloseHandle(hDevice)) {
+		printf("CloseHandle failed: %lu\n", GetLastError());
+	}
+
 	return true;
 }
 
