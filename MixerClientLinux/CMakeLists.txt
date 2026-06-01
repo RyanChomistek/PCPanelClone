@@ -39,6 +39,11 @@ target_include_directories(MixerClientLinux PRIVATE
     ${X11_INCLUDE_DIRS}
 )
 
+option(PCPANEL_DEBUG "Enable verbose debug logging" OFF)
+if(PCPANEL_DEBUG)
+    target_compile_definitions(MixerClientLinux PRIVATE PCPANEL_DEBUG)
+endif()
+
 target_compile_options(MixerClientLinux PRIVATE
     ${HIDAPI_CFLAGS_OTHER}
     ${PULSE_CFLAGS_OTHER}

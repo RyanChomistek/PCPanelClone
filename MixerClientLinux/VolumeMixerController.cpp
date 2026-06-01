@@ -6,9 +6,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "Util.h"
+
 #include <algorithm>
 #include <fstream>
-#include <iostream>
 #include <string>
 #include <vector>
 #include <ctime>
@@ -17,7 +18,6 @@
 
 using namespace nlohmann::literals;
 
-static constexpr bool s_fEnableLogging = true;
 
 // ---------------------------------------------------------------------------
 // PulseAudio data types
@@ -290,12 +290,12 @@ float VolumeMixerController::SetVolume(const std::string& processName, float vol
 {
     float newVolume = -1.0f;
     auto inputs = pulse().getSinkInputs();
-    if (s_fEnableLogging) {
-        std::cout << "SetVolume(\"" << processName << "\") — active sink inputs:";
-        for (const auto& si : inputs)
-            std::cout << " [" << si.processName << "]";
-        std::cout << '\n';
-    }
+#ifdef PCPANEL_DEBUG
+    printf("SetVolume(\"%s\") — active sink inputs:", processName.c_str());
+    for (const auto& si : inputs)
+        printf(" [%s]", si.processName.c_str());
+    printf("\n");
+#endif
     for (const auto& si : inputs) {
         if (si.processName.find(processName) == std::string::npos) continue;
 
@@ -303,8 +303,7 @@ float VolumeMixerController::SetVolume(const std::string& processName, float vol
         pulse().setSinkInputVolume(si.index, floatToPaVolume(next, si.channels));
         newVolume = next;
 
-        if (s_fEnableLogging)
-            std::cout << si.processName << " vol=" << next << '\n';
+        DLOG("%s vol=%g\n", si.processName.c_str(), next);
     }
     return newVolume;
 }
@@ -314,8 +313,7 @@ float VolumeMixerController::SetMasterVolume(float volumeDelta)
     PaSinkInfo sink = pulse().getDefaultSink();
     float next = std::clamp(paVolumeToFloat(sink.volume) + volumeDelta, 0.0f, 1.0f);
     pulse().setDefaultSinkVolume(floatToPaVolume(next, sink.volume.channels ? sink.volume.channels : 2));
-    if (s_fEnableLogging)
-        std::cout << "master vol=" << next << '\n';
+    DLOG("master vol=%g\n", next);
     return next;
 }
 
@@ -448,8 +446,7 @@ VolumeMixerController::VolumeMixerController()
 
 void VolumeMixerController::ReadButton(int iButton, bool value)
 {
-    if (s_fEnableLogging)
-        std::cout << "btn id:" << iButton << " val:" << value << '\n';
+    DLOG("btn id:%d val:%d\n", iButton, (int)value);
 
     if (iButton < 0 || iButton >= numDials) return;
 
@@ -475,8 +472,7 @@ void VolumeMixerController::ReadButton(int iButton, bool value)
 
 void VolumeMixerController::ReadDial(int iDial, int64_t value)
 {
-    if (s_fEnableLogging)
-        std::cout << "dial id:" << iDial << " val:" << value << '\n';
+    DLOG("dial id:%d val:%lld\n", iDial, (long long)value);
 
     if (iDial < 0 || iDial >= numDials) return;
 

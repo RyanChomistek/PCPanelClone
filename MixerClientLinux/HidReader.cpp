@@ -6,10 +6,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "Util.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <map>
 #include <vector>
 
@@ -261,17 +262,17 @@ void HidReader::buildInputIndex(const uint8_t* desc, int descLen)
     std::ranges::sort(dialIndexes);
     std::ranges::sort(buttonIndexes);
 
-    std::cout << "\ndials: ";
+    DLOG("\ndials: ");
     for (int i = 0; i < (int)dialIndexes.size(); ++i) {
         hidValues[dialIndexes[i]].typeIndex = (int)dialIndexes.size() - 1 - i;
-        std::cout << "[" << i << "," << dialIndexes[i] << "] ";
+        DLOG("[%d,%d] ", i, dialIndexes[i]);
     }
-    std::cout << "  buttons: ";
+    DLOG("  buttons: ");
     for (int i = 0; i < (int)buttonIndexes.size(); ++i) {
         hidButtons[buttonIndexes[i]].typeIndex = i;
-        std::cout << "[" << i << "," << buttonIndexes[i] << "] ";
+        DLOG("[%d,%d] ", i, buttonIndexes[i]);
     }
-    std::cout << "\n";
+    DLOG("\n");
 }
 
 void HidReader::decodeReport(const uint8_t* report, int len)
@@ -311,7 +312,7 @@ void HidReader::decodeReport(const uint8_t* report, int len)
         hv.value = raw;
 
         if (raw != 0) {
-            printf("DIAL di=%d typeIndex=%d delta=%d\n", di, hv.typeIndex, raw);
+            DLOG("DIAL di=%d typeIndex=%d delta=%d\n", di, hv.typeIndex, raw);
             ReadDial(hv.typeIndex, (int64_t)raw);
         }
         (void)prev;
@@ -326,7 +327,7 @@ void HidReader::decodeReport(const uint8_t* report, int len)
 
         if (pressed != hb.value) {
             hb.value = pressed;
-            printf("BUTTON di=%d typeIndex=%d on=%d\n", di, hb.typeIndex, (int)pressed);
+            DLOG("BUTTON di=%d typeIndex=%d on=%d\n", di, hb.typeIndex, (int)pressed);
             ReadButton(hb.typeIndex, pressed);
         }
     }
@@ -334,13 +335,13 @@ void HidReader::decodeReport(const uint8_t* report, int len)
 
 bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t targetUsage)
 {
-    printf("  tryDevice: opening rawFd for %s\n", path);
+    DLOG("  tryDevice: opening rawFd for %s\n", path);
     int rawFd = open(path, O_RDONLY | O_NONBLOCK);
     if (rawFd < 0) {
         perror("  tryDevice: open() failed");
         return false;
     }
-    printf("  tryDevice: rawFd=%d OK\n", rawFd);
+    DLOG("  tryDevice: rawFd=%d OK\n", rawFd);
 
     struct hidraw_report_descriptor rptDesc{};
     int descSize = 0;
@@ -350,11 +351,11 @@ bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t t
         return false;
     }
     if (descSize == 0) {
-        printf("  tryDevice: descriptor size is 0, skipping\n");
+        DLOG("  tryDevice: descriptor size is 0, skipping\n");
         close(rawFd);
         return false;
     }
-    printf("  tryDevice: descriptor size = %d bytes\n", descSize);
+    DLOG("  tryDevice: descriptor size = %d bytes\n", descSize);
 
     rptDesc.size = descSize;
     if (ioctl(rawFd, HIDIOCGRDESC, &rptDesc) < 0) {
@@ -362,14 +363,16 @@ bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t t
         close(rawFd);
         return false;
     }
-    printf("  tryDevice: descriptor read OK\n");
+    DLOG("  tryDevice: descriptor read OK\n");
 
+#ifdef PCPANEL_DEBUG
     printf("  tryDevice: raw descriptor bytes:");
     for (int i = 0; i < descSize; ++i) {
         if (i % 16 == 0) printf("\n    %04x: ", i);
         printf("%02x ", rptDesc.value[i]);
     }
     printf("\n");
+#endif
 
     close(rawFd);
 
@@ -377,6 +380,7 @@ bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t t
     std::vector<InputField> fields = parseDescriptor(rptDesc.value, descSize,
                                                      inBytes, outBytes);
 
+#ifdef PCPANEL_DEBUG
     printf("  tryDevice: parsed %zu input fields (inBytes=%d outBytes=%d):\n",
            fields.size(), inBytes, outBytes);
     for (const auto& f : fields) {
@@ -388,6 +392,7 @@ bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t t
                f.reportSize, f.bitOffset,
                (int)f.isRelative, (int)f.isButton, f.reportID);
     }
+#endif
 
     bool found = false;
     for (const auto& f : fields) {
@@ -396,34 +401,34 @@ bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t t
             break;
         }
     }
-    printf("  tryDevice: usage match (page=0x%04x usage=0x%04x) found=%d\n",
-           targetUsagePage, targetUsage, (int)found);
+    DLOG("  tryDevice: usage match (page=0x%04x usage=0x%04x) found=%d\n",
+         targetUsagePage, targetUsage, (int)found);
 
     // hidapi already confirmed usage/usagePage via top-level Application Collection,
     // so trust the enumeration result even if no individual input field carries 0x37.
     if (!found) {
-        printf("  tryDevice: no input field matched target usage — proceeding anyway "
-               "(top-level collection match from hidapi enumeration)\n");
+        DLOG("  tryDevice: no input field matched target usage — proceeding anyway "
+             "(top-level collection match from hidapi enumeration)\n");
     }
 
-    printf("  tryDevice: calling hid_open_path(%s)\n", path);
+    DLOG("  tryDevice: calling hid_open_path(%s)\n", path);
     dev = hid_open_path(path);
     if (!dev) {
         fprintf(stderr, "  tryDevice: hid_open_path failed: %ls\n", hid_error(nullptr));
         return false;
     }
-    printf("  tryDevice: hid_open_path OK\n");
+    DLOG("  tryDevice: hid_open_path OK\n");
 
     buildInputIndex(rptDesc.value, descSize);
 
-    printf("Input report length: %d bytes\n", inputReportLen);
-    printf("Output report length: %d bytes\n", outputReportLen);
+    DLOG("Input report length: %d bytes\n", inputReportLen);
+    DLOG("Output report length: %d bytes\n", outputReportLen);
 
     OnSync();
 
     std::vector<uint8_t> report(std::max(inputReportLen, 64));
 
-    printf("Listening for HID input reports on %s...\n", path);
+    DLOG("Listening for HID input reports on %s...\n", path);
 
     while (true) {
         int n = hid_read_timeout(dev, report.data(), report.size(), 1000 /*ms*/);
@@ -438,12 +443,14 @@ bool HidReader::tryDevice(const char* path, uint16_t targetUsagePage, uint16_t t
             continue;
         }
 
+#ifdef PCPANEL_DEBUG
         printf("  report: %d bytes:", n);
         for (int i = 0; i < n; ++i) printf(" %02x", report[i]);
         printf("\n");
+#endif
 
         decodeReport(report.data(), n);
-        std::cout << '\n';
+        DLOG("\n");
     }
 
     hid_close(dev);
@@ -456,13 +463,13 @@ int HidReader::HrReadLoop()
     // Enumerate all HID devices and look for usage page 0x01, usage 0x37 (Generic Desktop / Dial)
     struct hid_device_info* devs = hid_enumerate(0, 0);
     for (struct hid_device_info* d = devs; d != nullptr; d = d->next) {
-        printf("Device: %s  usagePage=0x%04x  usage=0x%04x  manufacturer=%ls  product=%ls\n",
-               d->path, d->usage_page, d->usage,
-               d->manufacturer_string ? d->manufacturer_string : L"",
-               d->product_string      ? d->product_string      : L"");
+        DLOG("Device: %s  usagePage=0x%04x  usage=0x%04x  manufacturer=%ls  product=%ls\n",
+             d->path, d->usage_page, d->usage,
+             d->manufacturer_string ? d->manufacturer_string : L"",
+             d->product_string      ? d->product_string      : L"");
 
         if (d->usage_page == 0x01 && d->usage == 0x37) {
-            printf("  → Candidate dial device, opening...\n");
+            DLOG("  → Candidate dial device, opening...\n");
             tryDevice(d->path, d->usage_page, d->usage);
         }
     }
